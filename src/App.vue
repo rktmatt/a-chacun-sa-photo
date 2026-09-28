@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import iconUrl from "../src-tauri/icons/icon.png";
+import { version } from "../package.json";
+import thirdPartyNotices from "../THIRD-PARTY-NOTICES.md?raw";
 
 type Child = { id: number; name: string; allowsDistribution: boolean };
 type Tag = { id: string; childId: number; x: number; y: number; width: number; height: number };
@@ -13,7 +15,11 @@ const roster = ref<Child[]>([]);
 const photos = ref<Photo[]>([]);
 const selected = ref(0);
 const unlocked = ref(false);
-const legacyRoster = ref(false);
+// vault : coffre-fort du système ; legacy : fichier illisible ; setup/unlock : repli par phrase de passe (Linux sans coffre-fort).
+const lockMode = ref<"vault" | "legacy" | "setup" | "unlock">("vault");
+const lockPassphrase = ref("");
+const lockPassphraseConfirm = ref("");
+const showLockPassphrase = ref(false);
 const childName = ref("");
 const childAllowed = ref(false);
 const editingChild = ref<Child | null>(null);
@@ -24,6 +30,7 @@ const notice = ref("");
 const working = ref(false);
 const exportProgress = ref<{ done: number; total: number } | null>(null);
 const imageFrame = ref<HTMLElement>();
+const aboutDialog = ref<HTMLDialogElement>();
 const canvasBox = ref<HTMLElement>();
 const photoImg = ref<HTMLImageElement>();
 const zoom = ref(1);
@@ -56,7 +63,7 @@ watch(selected, () => { zoom.value = 1; });
 function toggleChild(id: number) { selectedChildId.value = selectedChildId.value === id ? null : id; }
 function onKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement;
-  if (["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) || aboutDialog.value?.open) return;
   if (event.key === "ArrowLeft" && selected.value > 0) selected.value--;
   if (event.key === "ArrowRight" && selected.value < photos.value.length - 1) selected.value++;
   if (event.key === "+" || event.key === "=") setZoom(zoom.value * 1.5);
@@ -76,31 +83,42 @@ onMounted(async () => {
 
 function message(value: string) { notice.value = value; }
 
-async function openRoster() {
+async function unlockedWith(action: () => Promise<unknown>, success: string) {
   working.value = true;
   try {
-    await invoke("open_roster");
+    await action();
     roster.value = await invoke<Child[]>("list_children");
     unlocked.value = true;
-    legacyRoster.value = false;
-    message("La classe est prête.");
+    lockPassphrase.value = lockPassphraseConfirm.value = "";
+    message(success);
   } catch (error) {
-    if (error === "LEGACY_ROSTER") {
-      legacyRoster.value = true;
-      message("La classe enregistrée sur cet ordinateur ne peut pas être ouverte.");
-    } else {
-      message(String(error));
-    }
+    if (error === "LEGACY_ROSTER") { lockMode.value = "legacy"; message("La classe enregistrée sur cet ordinateur ne peut pas être ouverte."); }
+    else if (error === "PASSPHRASE_SETUP") { lockMode.value = "setup"; notice.value = ""; }
+    else if (error === "PASSPHRASE_REQUIRED") { lockMode.value = "unlock"; notice.value = ""; }
+    else message(errorText(error));
   } finally { working.value = false; }
+}
+
+const openRoster = () => unlockedWith(() => invoke("open_roster"), "La classe est prête.");
+
+async function submitPassphrase() {
+  const creating = lockMode.value === "setup";
+  if (lockPassphrase.value.length < 8) { message("La phrase de passe doit contenir au moins 8 caractères."); return; }
+  if (creating && lockPassphrase.value !== lockPassphraseConfirm.value) { message("Les deux saisies ne sont pas identiques. Retapez la même phrase de passe dans les deux champs."); return; }
+  await unlockedWith(() => invoke("open_roster_with_passphrase", { passphrase: lockPassphrase.value, create: creating }),
+    creating ? "Classe créée. Retenez bien votre phrase de passe : elle vous sera demandée à chaque ouverture." : "La classe est prête.");
 }
 
 async function startNewClass() {
   working.value = true;
-  try {
-    await invoke("archive_legacy_roster");
-    await openRoster();
-    message("Nouvelle classe prête. L’ancien fichier a été archivé, sans être supprimé.");
-  } catch (error) { message(String(error)); } finally { working.value = false; }
+  try { await invoke("archive_legacy_roster"); } catch (error) { message(errorText(error)); return; } finally { working.value = false; }
+  await unlockedWith(() => invoke("open_roster"), "Nouvelle classe prête. L’ancien fichier a été archivé, sans être supprimé.");
+}
+
+async function forgotPassphrase() {
+  const confirmed = await ask("Sans la phrase de passe, la liste actuelle des élèves ne peut plus être lue, par personne. Vous pouvez commencer une nouvelle classe : l’ancienne liste sera mise de côté (archivée, pas supprimée), et vous choisirez une nouvelle phrase de passe.",
+    { title: "Phrase de passe oubliée", kind: "warning", okLabel: "Commencer une nouvelle classe", cancelLabel: "Annuler" });
+  if (confirmed) await startNewClass();
 }
 
 async function reloadRoster() { roster.value = await invoke<Child[]>("list_children"); }
@@ -275,11 +293,11 @@ function beginEdit(event: PointerEvent, tag: Tag, handle: Handle) {
   editing.value = { tag, handle, start: pointerPosition(event), origin: { x: tag.x, y: tag.y, width: tag.width, height: tag.height } };
   imageFrame.value!.setPointerCapture(event.pointerId);
 }
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 function applyEdit(event: PointerEvent) {
   const { tag, handle, start, origin: o } = editing.value!;
   const end = pointerPosition(event);
   const dx = end.x - start.x, dy = end.y - start.y;
-  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
   if (handle === "move") {
     tag.x = clamp(o.x + dx, 0, 1 - o.width);
     tag.y = clamp(o.y + dy, 0, 1 - o.height);
@@ -305,6 +323,40 @@ function finishTag() {
   drawing.value = null; draft.value = null; editing.value = null;
 }
 function removeTag(id: string) { if (current.value) current.value.tags = current.value.tags.filter((tag) => tag.id !== id); }
+// Alternative clavier au dessin à la souris (RGAA) : Entrée ajoute un cadre au centre de la photo,
+// flèches pour le déplacer, Maj + flèches pour le redimensionner, Suppr pour le retirer.
+const KEY_STEP = 0.01;
+async function addTagAtCenter() {
+  if (!current.value) return;
+  if (selectedChildId.value === null) { message("Choisissez d'abord un élève dans la liste, puis revenez sur la photo."); return; }
+  const img = photoImg.value;
+  const ratio = img?.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
+  const height = 0.2, width = Math.min(0.9, (height / ratio) * 0.8);
+  const tag: Tag = { id: crypto.randomUUID(), childId: selectedChildId.value, x: (1 - width) / 2, y: (1 - height) / 2, width, height };
+  current.value.tags.push(tag);
+  await nextTick();
+  imageFrame.value?.querySelector<HTMLElement>(`[data-tag="${tag.id}"]`)?.focus();
+}
+const arrowKeys: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+function tagKey(event: KeyboardEvent, tag: Tag) {
+  const arrow = arrowKeys[event.key];
+  if (event.key === "Delete" || event.key === "Backspace") {
+    removeTag(tag.id);
+    imageFrame.value?.focus();
+  } else if (arrow && event.shiftKey) {
+    tag.width = clamp(tag.width + arrow[0] * KEY_STEP, MIN_TAG_SIZE, 1 - tag.x);
+    tag.height = clamp(tag.height + arrow[1] * KEY_STEP, MIN_TAG_SIZE, 1 - tag.y);
+  } else if (arrow) {
+    tag.x = clamp(tag.x + arrow[0] * KEY_STEP, 0, 1 - tag.width);
+    tag.y = clamp(tag.y + arrow[1] * KEY_STEP, 0, 1 - tag.height);
+  } else return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+function tagLabel(tag: Tag) {
+  return `Cadre de ${childById(tag.childId)?.name ?? "élève retiré"}${isMasked(tag) ? ", flouté pour les autres familles" : ""}`;
+}
+
 function reassignTag(tag: Tag) { if (selectedChildId.value !== null) tag.childId = selectedChildId.value; }
 
 async function removePhoto() {
@@ -452,7 +504,8 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
   <main :class="{ locked: !unlocked }">
     <header class="topbar">
       <div class="brand"><img :src="iconUrl" alt="" /><div><h1>À chacun sa photo</h1><p>Préparez les photos à remettre aux familles.</p></div></div>
-      <div v-if="unlocked" class="actions">
+      <div class="actions">
+        <template v-if="unlocked">
         <label class="button" :class="photos.length ? 'secondary' : 'primary'">Ajouter des photos<input type="file" accept="image/jpeg,image/png,image/heic,.heic,.heif" multiple :disabled="working" @change="importPhotos" /></label>
         <select v-model="maskMode" class="mask-mode" aria-label="Masquage des visages non autorisés" :disabled="working">
           <option value="blur">Masquage : flou</option>
@@ -460,6 +513,8 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
         </select>
         <button class="primary" :disabled="working || !photos.length || !roster.length" @click="exportPhotos">Exporter par élève</button>
         <button class="ghost" :disabled="!photos.length" @click="discardSession">Effacer la session</button>
+        </template>
+        <button type="button" class="ghost" @click="aboutDialog?.showModal()">À propos</button>
       </div>
     </header>
     <div v-if="exportProgress" class="export-progress" role="status">
@@ -468,8 +523,30 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
     </div>
     <p v-else-if="notice" class="notice" role="status">{{ notice }}</p>
 
-    <section v-if="!unlocked" class="unlock">
-      <template v-if="legacyRoster"><h2>Une ancienne classe ne peut pas être ouverte</h2><p>Elle peut provenir de la version d’essai qui utilisait une ancienne protection. Vous pouvez commencer une nouvelle classe : l’ancien fichier sera archivé, sans être supprimé.</p><button class="primary" :disabled="working" @click="startNewClass">Commencer une nouvelle classe</button></template>
+    <section v-if="!unlocked" class="unlock" :class="{ wide: lockMode === 'setup' || lockMode === 'unlock' }">
+      <template v-if="lockMode === 'legacy'"><h2>Une ancienne classe ne peut pas être ouverte</h2><p>Elle peut provenir de la version d’essai qui utilisait une ancienne protection. Vous pouvez commencer une nouvelle classe : l’ancien fichier sera archivé, sans être supprimé.</p><button class="primary" :disabled="working" @click="startNewClass">Commencer une nouvelle classe</button></template>
+      <form v-else-if="lockMode === 'setup'" class="passphrase" @submit.prevent="submitPassphrase">
+        <h2>Protégez la liste de vos élèves</h2>
+        <p>D’habitude, l’application range toute seule la clé qui protège la liste de vos élèves dans le <strong>coffre-fort</strong> de l’ordinateur (un espace sécurisé prévu par le système). Cet ordinateur n’en propose pas : c’est fréquent sous Linux.</p>
+        <p>Choisissez donc une <strong>phrase de passe</strong>. Elle sert de clé : la liste des élèves et les accords des familles sont enregistrés sous une forme illisible (chiffrée). Sans cette phrase, personne ne peut les lire, même en copiant le fichier.</p>
+        <ul class="passphrase-tips">
+          <li>Elle vous sera demandée <strong>à chaque ouverture</strong> de l’application.</li>
+          <li>Choisissez quelques mots faciles à retenir pour vous, par exemple « le chat dort sur le radiateur » (8 caractères minimum).</li>
+          <li>Notez-la en lieu sûr. Si vous l’oubliez, la liste ne pourra pas être récupérée : il faudra ressaisir la classe. Vos photos ne sont pas concernées, l’application ne les enregistre jamais.</li>
+        </ul>
+        <label>Phrase de passe<input v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" /></label>
+        <label>Retapez-la pour vérifier<input v-model="lockPassphraseConfirm" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" /></label>
+        <label class="consent-field"><input v-model="showLockPassphrase" type="checkbox" /><span>Afficher ce que je tape</span></label>
+        <button class="primary" :disabled="working || !lockPassphrase || !lockPassphraseConfirm">Créer ma classe protégée</button>
+      </form>
+      <form v-else-if="lockMode === 'unlock'" class="passphrase" @submit.prevent="submitPassphrase">
+        <h2>Votre classe</h2>
+        <p>Sur cet ordinateur, la liste de vos élèves est protégée par la phrase de passe que vous avez choisie lors de la création de la classe.</p>
+        <label>Phrase de passe<input v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="current-password" autofocus /></label>
+        <label class="consent-field"><input v-model="showLockPassphrase" type="checkbox" /><span>Afficher ce que je tape</span></label>
+        <button class="primary" :disabled="working || !lockPassphrase">Ouvrir ma classe</button>
+        <button type="button" class="ghost" :disabled="working" @click="forgotPassphrase">J’ai oublié ma phrase de passe</button>
+      </form>
       <template v-else><h2>Votre classe</h2><p>La liste des élèves est protégée automatiquement par cet ordinateur. Les photos, elles, ne sont jamais enregistrées par l’application.</p><button class="primary" :disabled="working" @click="openRoster">Ouvrir ma classe</button></template>
     </section>
 
@@ -542,12 +619,13 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
             <button class="nav remove-photo" title="Retirer cette photo de la session" @click="removePhoto">Retirer</button>
           </div>
           <div ref="canvasBox" class="canvas" :class="{ zoomed: zoom > 1 }" @wheel="wheelZoom">
-            <div ref="imageFrame" class="image-frame" :class="{ armed: selectedChildId !== null }" @pointerdown="beginTag" @pointermove="moveTag" @pointerup="finishTag" @pointercancel="finishTag">
+            <div ref="imageFrame" class="image-frame" :class="{ armed: selectedChildId !== null }" tabindex="0" role="group" :aria-label="`Photo ${current.name}`" aria-describedby="keyboard-help" @keydown.enter.self.prevent="addTagAtCenter" @pointerdown="beginTag" @pointermove="moveTag" @pointerup="finishTag" @pointercancel="finishTag">
               <img ref="photoImg" :src="current.url" :alt="current.name" :style="imgStyle" draggable="false" />
-              <div v-for="tag in displayTags" :key="tag.id" class="tag" :class="{ masked: isMasked(tag), editing: editing?.tag.id === tag.id }" :style="tagStyle(tag)" title="Glisser pour déplacer, tirer un coin pour redimensionner" @pointerdown.stop="beginEdit($event, tag, 'move')"><div v-for="handle in handles" :key="handle" class="handle" :class="handle" aria-hidden="true" @pointerdown.stop="beginEdit($event, tag, handle)"></div><span>{{ childById(tag.childId)?.name ?? "Élève retiré" }}</span><button v-if="selectedChild && selectedChildId !== tag.childId" class="reassign" :aria-label="`Attribuer ce cadre à ${selectedChild.name}`" :title="`Attribuer ce cadre à ${selectedChild.name}`" @pointerdown.stop @click.stop="reassignTag(tag)">⇄</button><button :aria-label="`Retirer le cadre de ${childById(tag.childId)?.name}`" title="Retirer ce cadre" @pointerdown.stop @click.stop="removeTag(tag.id)">×</button></div>
+              <div v-for="tag in displayTags" :key="tag.id" class="tag" :class="{ masked: isMasked(tag), editing: editing?.tag.id === tag.id }" :style="tagStyle(tag)" :data-tag="tag.id" tabindex="0" role="button" :aria-label="tagLabel(tag)" aria-describedby="keyboard-help" @keydown="tagKey($event, tag)" title="Glisser pour déplacer, tirer un coin pour redimensionner" @pointerdown.stop="beginEdit($event, tag, 'move')"><div v-for="handle in handles" :key="handle" class="handle" :class="handle" aria-hidden="true" @pointerdown.stop="beginEdit($event, tag, handle)"></div><span>{{ childById(tag.childId)?.name ?? "Élève retiré" }}</span><button v-if="selectedChild && selectedChildId !== tag.childId" class="reassign" :aria-label="`Attribuer ce cadre à ${selectedChild.name}`" :title="`Attribuer ce cadre à ${selectedChild.name}`" @pointerdown.stop @click.stop="reassignTag(tag)">⇄</button><button :aria-label="`Retirer le cadre de ${childById(tag.childId)?.name}`" title="Retirer ce cadre" @pointerdown.stop @click.stop="removeTag(tag.id)">×</button></div>
               <div v-if="draft" class="tag draft" :class="{ masked: !selectedChild?.allowsDistribution }" :style="tagStyle(draft)"></div>
             </div>
           </div>
+          <p id="keyboard-help" class="sr-only">Au clavier : Entrée sur la photo ajoute un cadre pour l’élève choisi. Sur un cadre, flèches pour le déplacer, Majuscule et flèches pour le redimensionner, Suppr pour le retirer.</p>
           <p class="hint">
             <template v-if="selectedChildId === UNKNOWN_ID">Encadrez un visage à flouter dans tous les dossiers (enfant d’une autre classe, visiteur…).</template>
             <template v-else-if="selectedChild">Encadrez le visage de <strong>{{ selectedChild.name }}</strong>.<template v-if="!selectedChild.allowsDistribution"> Il sera flouté dans les dossiers des autres élèves.</template></template>
@@ -567,5 +645,31 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
         </div>
       </section>
     </div>
+    <dialog ref="aboutDialog" class="about" aria-labelledby="about-title">
+      <form method="dialog" class="about-close"><button class="ghost" aria-label="Fermer">×</button></form>
+      <h2 id="about-title">À chacun sa photo <span>version {{ version }}</span></h2>
+      <p>Trier les photos de classe par élève, en floutant les enfants dont la famille n’a pas autorisé la diffusion.</p>
+      <h3>Vos données</h3>
+      <ul>
+        <li>L’application fonctionne <strong>sans Internet</strong> : aucune connexion, aucun compte, aucune statistique d’utilisation.</li>
+        <li>Seule la liste des élèves (nom et accord de diffusion) est enregistrée, chiffrée, sur cet ordinateur.</li>
+        <li>Les photos ne sont jamais copiées par l’application : elles restent en mémoire le temps de la session, puis sont écrites uniquement dans le dossier d’export que vous choisissez, sans leurs métadonnées (date, lieu GPS…).</li>
+        <li>L’application aide à respecter les choix des familles mais ne détecte pas les visages : c’est à vous d’encadrer chaque enfant non autorisé visible, y compris au second plan.</li>
+      </ul>
+      <h3>Utiliser le clavier</h3>
+      <ul>
+        <li><kbd>←</kbd> <kbd>→</kbd> : photo précédente ou suivante ; <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> : zoom.</li>
+        <li>Choisissez un élève, placez-vous sur la photo avec <kbd>Tab</kbd> puis appuyez sur <kbd>Entrée</kbd> pour ajouter un cadre au centre.</li>
+        <li>Sur un cadre : flèches pour le déplacer, <kbd>Maj</kbd> + flèches pour le redimensionner, <kbd>Suppr</kbd> pour le retirer.</li>
+      </ul>
+      <h3>Mises à jour</h3>
+      <p>L’application ne se met jamais à jour toute seule (elle ne se connecte pas à Internet). Consultez de temps en temps la page où vous l’avez téléchargée pour installer la dernière version.</p>
+      <h3>Licence</h3>
+      <p>Logiciel libre distribué sous licence EUPL-1.2 (licence publique de l’Union européenne). Vous pouvez l’utiliser, l’étudier, le modifier et le redistribuer.</p>
+      <details>
+        <summary>Composants tiers et leurs licences</summary>
+        <pre>{{ thirdPartyNotices }}</pre>
+      </details>
+    </dialog>
   </main>
 </template>

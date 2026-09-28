@@ -1,12 +1,12 @@
 [package]
-name = "edu-pic"
+name = "a-chacun-sa-photo"
 version = "0.1.0"
-description = "Offline school photo sorting"
+description = "Tri hors ligne des photos de classe par élève"
 license = "EUPL-1.2"
 edition = "2021"
 
 [lib]
-name = "edu_pic_lib"
+name = "a_chacun_sa_photo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

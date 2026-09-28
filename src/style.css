@@ -446,3 +446,40 @@ input::placeholder { color: #7d8c86; }
 .canvas.zoomed { place-items: start; overflow: auto; }
 .canvas.zoomed .image-frame { margin: auto; max-width: none; max-height: none; }
 .tag .reassign { top: auto; bottom: -30px; right: -3px; background: var(--tableau); }
+
+/* ---------- Phrase de passe (repli sans coffre-fort) ---------- */
+.unlock.wide { width: min(640px, calc(100% - 32px)); max-height: calc(100vh - 120px); overflow-y: auto; background: var(--surface); padding: 28px 36px; }
+.passphrase { display: grid; gap: 14px; }
+.unlock .passphrase h2 { margin-bottom: 0; }
+.unlock .passphrase p { line-height: 1.5; margin-bottom: 0; }
+.passphrase-tips { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink-soft); }
+.passphrase > label:not(.consent-field) { display: grid; gap: 4px; font-weight: 650; }
+
+/* ---------- À propos ---------- */
+.about {
+  width: min(680px, calc(100% - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 24px 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 24px 60px -20px rgba(28, 43, 37, 0.5);
+}
+.about::backdrop { background: rgba(28, 43, 37, 0.45); }
+.about h2 { font-size: 1.35rem; margin-bottom: 8px; padding-right: 40px; }
+.about h2 span { font-size: 0.9rem; font-weight: 500; color: var(--ink-soft); margin-left: 6px; }
+.about h3 { font-size: 1rem; margin: 18px 0 6px; }
+.about ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.about p, .about li { color: var(--ink-soft); }
+.about-close { position: absolute; top: 12px; right: 12px; }
+.about-close button { width: 40px; padding: 0; font-size: 1.4rem; }
+.about details { margin-top: 18px; }
+.about summary { cursor: pointer; font-weight: 650; }
+.about pre { max-height: 280px; overflow: auto; padding: 12px; background: var(--paper); border-radius: 8px; font-size: 0.75rem; line-height: 1.4; white-space: pre-wrap; }
+kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--paper); font: inherit; font-size: 0.85em; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.image-frame:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+.tag:focus-visible { outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus); }
+.tag:focus-visible .handle { opacity: 1; }

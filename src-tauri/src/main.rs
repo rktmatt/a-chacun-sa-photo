@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    edu_pic_lib::run()
+    a_chacun_sa_photo_lib::run()
 }

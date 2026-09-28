@@ -34,7 +34,7 @@ struct ExportImage {
 fn data_dir() -> Result<PathBuf, String> {
     let path = dirs::data_local_dir()
         .ok_or("Impossible de déterminer le dossier de données local.")?
-        .join("edu-pic");
+        .join("a-chacun-sa-photo");
     fs::create_dir_all(&path).map_err(|_| "Impossible de créer le dossier de données de l'application.".to_string())?;
     Ok(path)
 }
@@ -64,30 +64,72 @@ fn safe_name(name: &str) -> Result<&str, String> {
     Ok(name)
 }
 
-#[tauri::command]
-fn open_roster(db: State<RosterDb>) -> Result<(), String> {
-    let path = data_dir()?.join("roster.sqlite");
-    let (key, already_existed) = roster_key()?;
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE)
-        .map_err(|_| "Impossible d'ouvrir le fichier de la classe.".to_string())?;
-    // SQLCipher encrypts pages, including WAL/journal data. The passphrase stays in process memory only.
-    connection.pragma_update(None, "key", key).map_err(|_| "Impossible d'ouvrir la classe.".to_string())?;
+/// Fichier témoin (sans aucun secret) : la classe est protégée par une phrase de passe saisie par l'enseignant,
+/// parce que cet ordinateur n'offrait pas de coffre-fort (fréquent sous Linux sans gnome-keyring/KWallet).
+const PASSPHRASE_MARKER: &str = "roster.passphrase-mode";
+
+fn open_encrypted(path: &Path, key: &str) -> Result<Connection, ()> {
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE).map_err(|_| ())?;
+    // SQLCipher chiffre les pages, y compris WAL/journal. La clé ne reste qu'en mémoire du processus.
+    connection.pragma_update(None, "key", key).map_err(|_| ())?;
     connection.execute_batch(&format!("PRAGMA cipher_memory_security = ON; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; {SCHEMA}"))
-        .map_err(|_| {
-            if already_existed {
-                "Impossible d'ouvrir la classe. Le coffre-fort sécurisé ou le fichier de la classe est peut-être endommagé.".to_string()
-            } else {
-                "LEGACY_ROSTER".to_string()
-            }
-        })?;
+        .map_err(|_| ())?;
+    Ok(connection)
+}
+
+fn store(db: &RosterDb, connection: Connection) -> Result<(), String> {
     *db.0.lock().map_err(|_| "Base de données indisponible.".to_string())? = Some(connection);
     Ok(())
+}
+
+/// Ouvre la classe avec la clé du coffre-fort du système. Erreurs sentinelles pour l'interface :
+/// `LEGACY_ROSTER` (fichier illisible avec une clé neuve), `PASSPHRASE_SETUP` (pas de coffre-fort, aucune classe :
+/// proposer de choisir une phrase de passe), `PASSPHRASE_REQUIRED` (classe protégée par phrase de passe).
+#[tauri::command]
+fn open_roster(db: State<RosterDb>) -> Result<(), String> {
+    let directory = data_dir()?;
+    let path = directory.join("roster.sqlite");
+    if directory.join(PASSPHRASE_MARKER).exists() { return Err("PASSPHRASE_REQUIRED".into()); }
+    let (key, already_existed) = match roster_key() {
+        Ok(found) => found,
+        Err(_) if !path.exists() => return Err("PASSPHRASE_SETUP".into()),
+        Err(message) => return Err(message),
+    };
+    let connection = open_encrypted(&path, &key).map_err(|_| {
+        if already_existed {
+            "Impossible d'ouvrir la classe. Le coffre-fort sécurisé ou le fichier de la classe est peut-être endommagé.".to_string()
+        } else {
+            "LEGACY_ROSTER".to_string()
+        }
+    })?;
+    store(&db, connection)
+}
+
+/// Repli sans coffre-fort : `create` choisit la phrase de passe d'une nouvelle classe, sinon elle déverrouille la classe existante.
+#[tauri::command]
+fn open_roster_with_passphrase(passphrase: String, create: bool, db: State<RosterDb>) -> Result<(), String> {
+    valid_passphrase(&passphrase)?;
+    let directory = data_dir()?;
+    let path = directory.join("roster.sqlite");
+    let marker = directory.join(PASSPHRASE_MARKER);
+    if create {
+        if path.exists() { return Err("Une classe existe déjà sur cet ordinateur.".into()); }
+        let connection = open_encrypted(&path, &passphrase).map_err(|_| "Impossible de créer la classe.".to_string())?;
+        fs::write(&marker, "La liste des élèves est protégée par une phrase de passe.\n")
+            .map_err(|_| "Impossible d'enregistrer le mode de protection de la classe.".to_string())?;
+        return store(&db, connection);
+    }
+    if !marker.exists() { return Err("Cette classe n'est pas protégée par une phrase de passe.".into()); }
+    let connection = open_encrypted(&path, &passphrase).map_err(|_| "Phrase de passe incorrecte.".to_string())?;
+    store(&db, connection)
 }
 
 #[tauri::command]
 fn archive_legacy_roster() -> Result<(), String> {
     let directory = data_dir()?;
     let roster = directory.join("roster.sqlite");
+    let marker = directory.join(PASSPHRASE_MARKER);
+    if marker.exists() { fs::remove_file(&marker).map_err(|_| "Impossible de réinitialiser la protection de la classe.".to_string())?; }
     if !roster.exists() { return Ok(()); }
     let archive = directory.join("archive");
     fs::create_dir_all(&archive).map_err(|_| "Impossible de créer le dossier d'archive.".to_string())?;
@@ -276,7 +318,7 @@ pub fn run() {
         .manage(RosterDb(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            open_roster, archive_legacy_roster, list_children, save_child, update_child, delete_child,
+            open_roster, open_roster_with_passphrase, archive_legacy_roster, list_children, save_child, update_child, delete_child,
             clear_roster, import_children, backup_roster, restore_roster, prepare_export_folder, write_export_image
         ])
         .run(tauri::generate_context!())
@@ -295,7 +337,7 @@ mod tests {
     }
 
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("edu-pic-test-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("a-chacun-sa-photo-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -320,6 +362,20 @@ mod tests {
         // La sauvegarde n'est pas lisible sans phrase de passe.
         let plain = Connection::open(&backup).unwrap();
         assert!(plain.query_row("SELECT count(*) FROM children", [], |r| r.get::<_, i64>(0)).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn passphrase_roster_rejects_wrong_passphrase() {
+        let dir = scratch("passphrase");
+        let path = dir.join("roster.sqlite");
+        let conn = open_encrypted(&path, "le chat dort au soleil").unwrap();
+        conn.execute("INSERT INTO children (name, allows_distribution) VALUES ('Léa', 0)", []).unwrap();
+        drop(conn);
+        assert!(open_encrypted(&path, "mauvaise phrase").is_err());
+        let conn = open_encrypted(&path, "le chat dort au soleil").unwrap();
+        assert_eq!(conn.query_row("SELECT count(*) FROM children", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+        drop(conn);
         fs::remove_dir_all(dir).unwrap();
     }
 
