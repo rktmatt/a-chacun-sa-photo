@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "À chacun sa photo",
+  "version": "0.1.0",
+  "identifier": "fr.achacunsaphoto",
+  "build": { "frontendDist": "../dist", "devUrl": "http://127.0.0.1:1420", "beforeDevCommand": "npm run dev", "beforeBuildCommand": "npm run build" },
+  "app": {
+    "windows": [{ "label": "main", "title": "À chacun sa photo", "width": 1180, "height": 800, "minWidth": 900, "minHeight": 640, "resizable": true }],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png"],
+    "targets": "all",
+    "windows": { "webviewInstallMode": { "type": "offlineInstaller" } }
+  }
+}

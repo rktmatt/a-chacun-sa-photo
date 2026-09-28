@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Only native file dialogs, confirmation prompts and closing the main window are exposed to the application window.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "dialog:allow-ask", "core:window:allow-destroy"]
+}
