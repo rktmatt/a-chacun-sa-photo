@@ -362,6 +362,8 @@ mod tests {
         // La sauvegarde n'est pas lisible sans phrase de passe.
         let plain = Connection::open(&backup).unwrap();
         assert!(plain.query_row("SELECT count(*) FROM children", [], |r| r.get::<_, i64>(0)).is_err());
+        // Windows refuse de supprimer un fichier encore ouvert.
+        drop((source, target, plain));
         fs::remove_dir_all(dir).unwrap();
     }
 
