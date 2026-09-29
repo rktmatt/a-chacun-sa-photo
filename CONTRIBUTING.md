@@ -23,6 +23,7 @@ Le détail de l’architecture est dans [CLAUDE.md](CLAUDE.md).
 
 ```sh
 npm run build                         # types + construction de l’interface
+npm test                              # règles de l’interface (floutage, export, import)
 cd src-tauri && cargo clippy --all-targets && cargo test
 ```
 

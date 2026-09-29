@@ -21,6 +21,7 @@ check:
   stage: check
   script:
     - npm run build
+    - npm test
     - cd src-tauri && cargo clippy --all-targets --locked -- -D warnings && cargo test --locked && cd ..
     # La liste des licences tierces doit être à jour avec les dépendances.
     - node scripts/third-party-notices.mjs && git diff --exit-code THIRD-PARTY-NOTICES.md

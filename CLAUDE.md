@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "À chacun sa photo" (package name `a-chacun-sa-photo`): offline desktop app for school teachers to sort class photos into one folder per pupil. Licensed EUPL-1.2 (`LICENSE`). Intended for open-source release and listing on French public education tool registries. All UI text and user-facing error messages (including those returned from Rust) are in French; keep it that way.
 
-Stack: Tauri 2 (Rust backend) + Vue 3 `<script setup>` + Vite + TypeScript. No Nuxt, no router, no state library — the whole frontend is `src/App.vue`.
+Stack: Tauri 2 (Rust backend) + Vue 3 `<script setup>` + Vite + TypeScript. No Nuxt, no router, no state library — the whole frontend is `src/App.vue` plus pure helpers in `src/logic.ts`.
 
 ## Commands
 
@@ -16,6 +16,7 @@ npm run tauri dev        # full app (starts Vite on 127.0.0.1:1420, strictPort)
 npm run build            # vue-tsc type check + Vite build into dist/
 npm run tauri build      # release installer for the current platform
 npx vue-tsc --noEmit     # type check frontend only
+npm test                 # Vitest: pure frontend rules in src/logic.test.ts
 cd src-tauri && cargo check    # / cargo clippy for the Rust side
 cd src-tauri && cargo test     # Rust tests (backup/restore, passphrase roster, export no-overwrite)
 node scripts/third-party-notices.mjs   # regenerate THIRD-PARTY-NOTICES.md after any dependency change (CI checks it)
@@ -23,7 +24,7 @@ node scripts/third-party-notices.mjs   # regenerate THIRD-PARTY-NOTICES.md after
 
 CI: `.gitlab-ci.yml` (Forge, Linux: checks + deb/AppImage) and `.github/workflows/build.yml` (GitHub mirror, Windows/macOS/Linux installers, unsigned for now). User docs in French under `docs/` (teacher guide, RGPD kit); keep them in sync with UI changes, and add a `CHANGELOG.md` entry.
 
-No frontend tests or linter yet.
+Frontend tests: pure rules (blur decision `isMaskedFor`, `maskEllipse`, `exportJobs`, `forgetTags`, `editBox`, `parseNames`, file/folder names) live in `src/logic.ts`, tested by Vitest in node env (no DOM/Tauri). Keep new pure logic there, not in `App.vue`. Manual pre-release checklist: `docs/recette.md` (keep in sync with UI). No linter yet.
 
 ## Non-negotiable constraints
 

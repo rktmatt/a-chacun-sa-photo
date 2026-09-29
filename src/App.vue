@@ -6,9 +6,8 @@ import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import iconUrl from "../src-tauri/icons/icon.png";
 import { version } from "../package.json";
 import thirdPartyNotices from "../THIRD-PARTY-NOTICES.md?raw";
+import { type Child, type Handle, type Tag, UNKNOWN_ID, MIN_TAG_SIZE, clamp, cleanFolderName, decodeText, editBox, exportFolderName, exportJobs, findChild, forgetTags, isMaskedFor, jpegName, maskEllipse, parseNames } from "./logic";
 
-type Child = { id: number; name: string; allowsDistribution: boolean };
-type Tag = { id: string; childId: number; x: number; y: number; width: number; height: number };
 type Photo = { id: string; name: string; file: File; url: string; tags: Tag[] };
 
 const roster = ref<Child[]>([]);
@@ -36,18 +35,13 @@ const photoImg = ref<HTMLImageElement>();
 const zoom = ref(1);
 const baseWidth = ref(0);
 const MAX_ZOOM = 6;
-// Visage à flouter partout (enfant d'une autre classe, passant…) : jamais de dossier, jamais d'accord.
-const UNKNOWN_ID = 0;
-const unknownChild: Child = { id: UNKNOWN_ID, name: "Visage inconnu", allowsDistribution: false };
 const drawing = ref<{ x: number; y: number } | null>(null);
 const draft = ref<{ x: number; y: number; width: number; height: number } | null>(null);
-type Handle = "move" | "nw" | "ne" | "sw" | "se";
 const handles: Handle[] = ["nw", "ne", "sw", "se"];
-const MIN_TAG_SIZE = 0.015;
 const editing = ref<{ tag: Tag; handle: Handle; start: { x: number; y: number }; origin: { x: number; y: number; width: number; height: number } } | null>(null);
 
 const current = computed(() => photos.value[selected.value]);
-const childById = (id: number) => id === UNKNOWN_ID ? unknownChild : roster.value.find((child) => child.id === id);
+const childById = (id: number) => findChild(roster.value, id);
 // Un cadre dont l'élève est introuvable est traité comme non autorisé.
 const isMasked = (tag: Tag) => !childById(tag.childId)?.allowsDistribution;
 const displayTags = computed(() => current.value?.tags ?? []);
@@ -144,9 +138,8 @@ async function saveEditChild() {
   } catch (error) { message(errorText(error)); }
 }
 
-// Les cadres d'un élève retiré de la classe restent floutés : ils deviennent des visages inconnus.
 function forgetChildren(ids: number[]) {
-  for (const photo of photos.value) for (const tag of photo.tags) if (ids.includes(tag.childId)) tag.childId = UNKNOWN_ID;
+  forgetTags(photos.value, ids);
   if (selectedChildId.value !== null && ids.includes(selectedChildId.value)) selectedChildId.value = null;
 }
 
@@ -175,25 +168,6 @@ async function clearRoster() {
     await reloadRoster();
     message("La liste des élèves a été effacée.");
   } catch (error) { message(errorText(error)); }
-}
-
-function decodeText(buffer: ArrayBuffer) {
-  try { return new TextDecoder("utf-8", { fatal: true }).decode(buffer); } catch { return new TextDecoder("windows-1252").decode(buffer); }
-}
-
-// Liste d'élèves : un nom par ligne, ou export tableur/ONDE avec colonnes « Nom » et « Prénom ».
-function parseNames(text: string): string[] {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
-  if (!lines.length) return [];
-  const separator = [";", "\t", ","].find((candidate) => lines[0].includes(candidate));
-  const cells = (line: string) => (separator ? line.split(separator) : [line]).map((cell) => cell.trim().replace(/^"(.*)"$/, "$1").trim());
-  const header = cells(lines[0]).map((cell) => cell.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
-  const first = header.findIndex((cell) => cell.startsWith("prenom"));
-  const last = header.findIndex((cell) => cell.startsWith("nom"));
-  const hasHeader = first >= 0 || last >= 0;
-  const names = (hasHeader ? lines.slice(1) : lines).map(cells).map((row) =>
-    first >= 0 && last >= 0 ? `${row[first] ?? ""} ${row[last] ?? ""}` : row[first >= 0 ? first : last >= 0 ? last : 0] ?? "");
-  return [...new Set(names.map((name) => name.replace(/\s+/g, " ").trim()).filter(Boolean))];
 }
 
 async function importRoster(event: Event) {
@@ -293,22 +267,10 @@ function beginEdit(event: PointerEvent, tag: Tag, handle: Handle) {
   editing.value = { tag, handle, start: pointerPosition(event), origin: { x: tag.x, y: tag.y, width: tag.width, height: tag.height } };
   imageFrame.value!.setPointerCapture(event.pointerId);
 }
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 function applyEdit(event: PointerEvent) {
   const { tag, handle, start, origin: o } = editing.value!;
   const end = pointerPosition(event);
-  const dx = end.x - start.x, dy = end.y - start.y;
-  if (handle === "move") {
-    tag.x = clamp(o.x + dx, 0, 1 - o.width);
-    tag.y = clamp(o.y + dy, 0, 1 - o.height);
-    return;
-  }
-  let left = o.x, top = o.y, right = o.x + o.width, bottom = o.y + o.height;
-  if (handle.includes("w")) left = clamp(left + dx, 0, right - MIN_TAG_SIZE);
-  if (handle.includes("e")) right = clamp(right + dx, left + MIN_TAG_SIZE, 1);
-  if (handle.includes("n")) top = clamp(top + dy, 0, bottom - MIN_TAG_SIZE);
-  if (handle.includes("s")) bottom = clamp(bottom + dy, top + MIN_TAG_SIZE, 1);
-  Object.assign(tag, { x: left, y: top, width: right - left, height: bottom - top });
+  Object.assign(tag, editBox(o, handle, end.x - start.x, end.y - start.y));
 }
 function moveTag(event: PointerEvent) {
   if (editing.value) { applyEdit(event); return; }
@@ -392,8 +354,6 @@ function wheelZoom(event: WheelEvent) {
 function tagStyle(tag: Pick<Tag, "x" | "y" | "width" | "height">) {
   return { left: `${tag.x * 100}%`, top: `${tag.y * 100}%`, width: `${tag.width * 100}%`, height: `${tag.height * 100}%` };
 }
-function cleanFolderName(name: string) { return name.replace(/[\\/:*?"<>|]/g, "-").trim() || "élève"; }
-function jpegName(name: string) { return `${name.replace(/\.[^.]+$/, "") || "photo"}.jpg`; }
 function canvasBlob(canvas: HTMLCanvasElement) { return new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Encodage JPEG impossible.")), "image/jpeg", 0.92)); }
 async function toBase64(blob: Blob) { return (await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]); reader.onerror = () => reject(reader.error); reader.readAsDataURL(blob); })); }
 
@@ -404,18 +364,10 @@ async function renderFor(photo: Photo, recipient: Child) {
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(bitmap, 0, 0);
   for (const tag of photo.tags) {
-    const child = childById(tag.childId);
-    if (child?.id === recipient.id || child?.allowsDistribution) continue;
-    // Ellipse inscrite dans le cadre (marge de 1,5 % de chaque côté), calculée avant tout rognage aux bords.
-    const cx = (tag.x + tag.width / 2) * canvas.width;
-    const cy = (tag.y + tag.height / 2) * canvas.height;
-    const rx = (tag.width / 2 + 0.015) * canvas.width;
-    const ry = (tag.height / 2 + 0.015) * canvas.height;
-    const x = Math.max(0, Math.floor(cx - rx));
-    const y = Math.max(0, Math.floor(cy - ry));
-    const w = Math.min(canvas.width, Math.ceil(cx + rx)) - x;
-    const h = Math.min(canvas.height, Math.ceil(cy + ry)) - y;
-    if (w <= 0 || h <= 0) continue;
+    if (!isMaskedFor(tag, recipient, roster.value)) continue;
+    const mask = maskEllipse(tag, canvas.width, canvas.height);
+    if (!mask) continue;
+    const { cx, cy, rx, ry, x, y, w, h } = mask;
     if (maskMode.value === "fill") fillEllipse(ctx, cx, cy, rx, ry);
     else obscure(ctx, canvas, x, y, w, h, cx, cy, rx, ry);
   }
@@ -456,15 +408,9 @@ function obscure(ctx: CanvasRenderingContext2D, source: HTMLCanvasElement, x: nu
   current.width = 0;
 }
 
-function exportFolderName(date: Date) {
-  const two = (value: number) => String(value).padStart(2, "0");
-  return `Photos du ${two(date.getDate())}-${two(date.getMonth() + 1)}-${date.getFullYear()} à ${two(date.getHours())}h${two(date.getMinutes())}`;
-}
-
 async function exportPhotos() {
   if (!photos.value.length || !roster.value.length) return;
-  const jobs = roster.value.flatMap((recipient) =>
-    photos.value.filter((item) => item.tags.some((tag) => tag.childId === recipient.id)).map((photo, index) => ({ recipient, photo, index })));
+  const jobs = exportJobs(roster.value, photos.value);
   if (!jobs.length) { message("Aucune photo n’est attribuée à un élève de la classe."); return; }
   const recipients = new Set(jobs.map((job) => job.recipient.id)).size;
   const untagged = photos.value.length - taggedPhotos.value;

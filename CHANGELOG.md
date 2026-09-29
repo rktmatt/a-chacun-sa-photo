@@ -16,6 +16,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 - Choix du masquage : flou ou aplat opaque.
 - Avertissement avant de quitter si des photos identifiées n’ont pas été exportées.
 - Documentation en français : guide de l’enseignant, kit RGPD (fiche de registre, modèle d’autorisation, note au DPO).
+- Tests automatiques des règles de floutage, d’export et d’import de la liste (`npm test`), et recette manuelle avant
+  publication (`docs/recette.md`).
 
 ### Modifié
 - L’accord de diffusion est désormais **non autorisé par défaut**.

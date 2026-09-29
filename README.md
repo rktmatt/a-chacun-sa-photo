@@ -57,8 +57,11 @@ npm install
 npm run tauri dev        # application complète
 npm run build            # vérification des types + construction de l’interface
 npm run tauri build      # installateur pour le système courant
+npm test                 # tests des règles de l’interface (floutage, export, import)
 cd src-tauri && cargo test
 ```
+
+Avant chaque version publiée : dérouler la [recette manuelle](docs/recette.md) sur chaque système.
 
 Architecture, contraintes et conventions : [CLAUDE.md](CLAUDE.md). Contribuer : [CONTRIBUTING.md](CONTRIBUTING.md).
 Composants tiers et licences : [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
