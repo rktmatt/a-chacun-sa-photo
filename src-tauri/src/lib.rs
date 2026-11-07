@@ -313,8 +313,50 @@ fn write_export_image(destination: String, image: ExportImage) -> Result<(), Str
     file.write_all(&bytes).map_err(|_| "Impossible d'écrire la photo (disque plein ?).".to_string())
 }
 
+/// Menu macOS en français (le menu par défaut de Tauri est en anglais : « File, Edit… »).
+/// « Quitter » ferme la fenêtre, pour passer par l'avertissement « Quitter sans exporter ? ».
+#[cfg(target_os = "macos")]
+fn french_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tauri::menu::Menu<R>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem as P, Submenu};
+    let name = "À chacun sa photo";
+    let quit = MenuItem::with_id(app, "quitter", format!("Quitter {name}"), true, Some("CmdOrCtrl+Q"))?;
+    let app_menu = Submenu::with_items(app, name, true, &[
+        &P::hide(app, Some(&format!("Masquer {name}")))?,
+        &P::hide_others(app, Some("Masquer les autres"))?,
+        &P::show_all(app, Some("Tout afficher"))?,
+        &P::separator(app)?,
+        &quit,
+    ])?;
+    let edit = Submenu::with_items(app, "Édition", true, &[
+        &P::undo(app, Some("Annuler"))?,
+        &P::redo(app, Some("Rétablir"))?,
+        &P::separator(app)?,
+        &P::cut(app, Some("Couper"))?,
+        &P::copy(app, Some("Copier"))?,
+        &P::paste(app, Some("Coller"))?,
+        &P::select_all(app, Some("Tout sélectionner"))?,
+    ])?;
+    let window = Submenu::with_items(app, "Fenêtre", true, &[
+        &P::minimize(app, Some("Réduire"))?,
+        &P::fullscreen(app, Some("Plein écran"))?,
+        &P::separator(app)?,
+        &P::close_window(app, Some("Fermer la fenêtre"))?,
+    ])?;
+    Menu::with_items(app, &[&app_menu, &edit, &window])
+}
+
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(french_menu).on_menu_event(|app, event| {
+        if event.id() == "quitter" {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.close();
+            }
+        }
+    });
+    builder
         .manage(RosterDb(Mutex::new(None)))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![

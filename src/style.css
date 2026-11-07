@@ -34,12 +34,34 @@ button, input, select, .button { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 /* ---------- Coque ---------- */
-main {
+.app {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
 }
-.unlock, .workspace { grid-row: 3; }
+/* <header> hors de <main> (RGAA 9.2) : <main> occupe la dernière rangée. */
+.content { grid-row: 4; display: grid; min-height: 0; }
+.content:focus, .stage:focus, #eleves-titre:focus { outline: none; }
+.unlock, .workspace { grid-row: 1; }
+
+/* Liens d'évitement (RGAA 12.7) : hors écran, visibles au focus. */
+.skip-links a {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: 10;
+  padding: 8px 14px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 6px;
+}
+.skip-links a:focus { top: 8px; }
+
+.field-label { font-size: 0.9rem; font-weight: 650; color: var(--ink); }
+.field-error { font-size: 0.9rem; font-weight: 600; color: var(--marge-deep); }
+.field-error::before { content: "⚠ "; }
+input[aria-invalid="true"] { border-color: var(--marge-deep); border-width: 2px; }
 
 .topbar {
   display: flex;
@@ -64,6 +86,7 @@ main {
   border-bottom: 1px solid #c9dfd1;
   font-size: 0.95rem;
 }
+.notice:empty { padding: 0; border: 0; }
 
 .export-progress {
   display: flex;
@@ -117,11 +140,11 @@ input:not([type="checkbox"]) {
   width: 100%;
   min-height: 42px;
   padding: 8px 12px;
-  border: 1px solid #b9c9c0;
+  border: 1px solid #7a8a83; /* ≥ 3:1 sur blanc (RGAA 3.3) */
   border-radius: 8px;
   background: var(--surface);
 }
-input::placeholder { color: #7d8c86; }
+input::placeholder { color: #5f6e68; }
 
 /* ---------- Écran d'ouverture ---------- */
 .unlock {
@@ -129,9 +152,11 @@ input::placeholder { color: #7d8c86; }
   justify-self: center;
   width: min(520px, calc(100% - 32px));
   padding: 32px 40px 40px 64px;
+  /* Lignes dessinées par background-size/position (en px) et non par des arrêts de dégradé en px :
+     WebKit n'agrandit pas ces arrêts avec le zoom de page (Ctrl/⌘ + =), les lignes se décalaient du texte. */
   background:
-    linear-gradient(90deg, transparent 40px, var(--marge) 40px, var(--marge) 42px, transparent 42px),
-    repeating-linear-gradient(180deg, transparent 0 31px, var(--seyes) 31px 32px),
+    linear-gradient(var(--marge), var(--marge)) 40px 0 / 2px 100% no-repeat,
+    linear-gradient(transparent calc(100% - 1px), var(--seyes) 0) 0 0 / 100% 32px repeat-y,
     var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -153,7 +178,7 @@ input::placeholder { color: #7d8c86; }
   overflow-y: auto;
   padding: 20px 20px 24px 44px;
   background:
-    linear-gradient(90deg, transparent 28px, var(--marge) 28px, var(--marge) 30px, transparent 30px),
+    linear-gradient(var(--marge), var(--marge)) 28px 0 / 2px 100% no-repeat,
     var(--surface);
   border-right: 1px solid var(--line);
 }
@@ -185,8 +210,8 @@ input::placeholder { color: #7d8c86; }
   list-style: none;
   margin: 0 0 0 -16px;
   padding: 0;
-  background: repeating-linear-gradient(180deg, transparent 0 43px, var(--seyes-strong) 43px 44px);
 }
+.pupils li { border-bottom: 1px solid var(--seyes-strong); }
 .pupil {
   width: 100%;
   min-height: 44px;
@@ -198,7 +223,9 @@ input::placeholder { color: #7d8c86; }
   text-align: left;
 }
 .pupil:hover { background: rgba(29, 107, 67, 0.07); }
-.pupil-name { overflow: hidden; text-overflow: ellipsis; }
+/* Noms jamais tronqués : retour à la ligne (RGAA 10.4). */
+.pupil { white-space: normal; padding-top: 6px; padding-bottom: 6px; }
+.pupil-name { overflow-wrap: anywhere; }
 .pupil-meta { display: flex; align-items: center; gap: 8px; flex: none; font-size: 0.82rem; }
 .pupil .count { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .pupil .status { color: var(--marge-deep); font-weight: 700; }
@@ -233,11 +260,13 @@ input::placeholder { color: #7d8c86; }
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
   gap: 12px;
   padding: 10px 16px;
 }
 .photo-nav strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
-.position { color: #9fa9a4; font-variant-numeric: tabular-nums; }
+.position { color: #9fa9a4; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nav { width: 40px; padding: 0; font-size: 1.6rem; line-height: 1; color: var(--stage-text); }
 .nav:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
 
@@ -266,6 +295,9 @@ input::placeholder { color: #7d8c86; }
   object-fit: contain;
 }
 
+/* Cadre : .tag-box porte la position, .tag (ellipse focusable) et les boutons ⇄ × sont frères (pas de boutons imbriqués). */
+.tag-box { position: absolute; min-width: 5px; min-height: 5px; line-height: 1.2; }
+.tag-box > .tag { inset: 0; }
 .tag {
   position: absolute;
   min-width: 5px;
@@ -305,7 +337,7 @@ input::placeholder { color: #7d8c86; }
   white-space: nowrap;
   border-radius: 3px 3px 3px 0;
 }
-.tag button {
+.tag-action {
   position: absolute;
   top: -30px;
   right: -3px;
@@ -322,7 +354,7 @@ input::placeholder { color: #7d8c86; }
 }
 .tag.masked {
   border-color: var(--marge);
-  background: repeating-linear-gradient(135deg, rgba(200, 50, 63, 0.18) 0 6px, rgba(200, 50, 63, 0.06) 6px 12px);
+  background: repeating-linear-gradient(135deg, rgba(200, 50, 63, 0.18) 0 0.375rem, rgba(200, 50, 63, 0.06) 0.375rem 0.75rem);
 }
 .tag.masked span { background: var(--marge); }
 .tag.draft { border-style: dashed; }
@@ -358,15 +390,19 @@ input::placeholder { color: #7d8c86; }
   min-height: 30px;
   padding: 0 6px;
   border-radius: 5px;
-  border: 1px solid #50565a;
+  border: 1px solid #8a9196;
   color: #c3cbc7;
   font-size: 0.82rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .strip button:hover { background: rgba(255, 255, 255, 0.08); }
-.strip button.done { background: #2c5a41; border-color: #3f7d5b; color: #fff; }
-.strip button.current { outline: 2px solid #fff; outline-offset: 1px; }
+/* « Identifiée » : coche ✓ + bordure verte, pas seulement la couleur (RGAA 3.1). Photo courante : fond blanc. */
+.strip button.done { background: #2c5a41; border-color: #6fbf8f; color: #fff; }
+.strip .done-mark { margin-right: 2px; }
+.strip button.current { background: #fff; border-color: #fff; color: var(--stage-edge); }
+/* Focus jaune sur la zone sombre : 8:1 sur le graphite (RGAA 10.7 / 3.3). */
+.stage :focus-visible { outline-color: #ffd23f; }
 
 .empty {
   grid-row: 1 / -1;
@@ -385,7 +421,7 @@ input::placeholder { color: #7d8c86; }
 .empty p { color: #b8c1bc; }
 
 @media (max-width: 900px) {
-  main { height: auto; min-height: 100vh; }
+  .app { height: auto; min-height: 100vh; }
   .topbar { flex-wrap: wrap; padding: 12px 16px; }
   .workspace { grid-template-columns: 1fr; }
   .register { border-right: 0; border-bottom: 1px solid var(--line); max-height: 45vh; }
@@ -430,7 +466,7 @@ input::placeholder { color: #7d8c86; }
 .mask-mode {
   min-height: 40px;
   padding: 8px 10px;
-  border: 1px solid #b9c9c0;
+  border: 1px solid #7a8a83;
   border-radius: 8px;
   background: var(--surface);
   color: var(--tableau-deep);
@@ -445,7 +481,7 @@ input::placeholder { color: #7d8c86; }
 .canvas { position: relative; }
 .canvas.zoomed { place-items: start; overflow: auto; }
 .canvas.zoomed .image-frame { margin: auto; max-width: none; max-height: none; }
-.tag .reassign { top: auto; bottom: -30px; right: -3px; background: var(--tableau); }
+.tag-action.reassign { top: auto; bottom: -30px; right: -3px; background: var(--tableau); }
 
 /* ---------- Phrase de passe (repli sans coffre-fort) ---------- */
 .unlock.wide { width: min(640px, calc(100% - 32px)); max-height: calc(100vh - 120px); overflow-y: auto; background: var(--surface); padding: 28px 36px; }
@@ -453,7 +489,8 @@ input::placeholder { color: #7d8c86; }
 .unlock .passphrase h2 { margin-bottom: 0; }
 .unlock .passphrase p { line-height: 1.5; margin-bottom: 0; }
 .passphrase-tips { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink-soft); }
-.passphrase > label:not(.consent-field) { display: grid; gap: 4px; font-weight: 650; }
+.passphrase > label:not(.consent-field) { font-weight: 650; margin-bottom: -10px; }
+.passphrase .field-error { margin-top: -8px; }
 
 /* ---------- À propos ---------- */
 .about {
@@ -480,6 +517,6 @@ input::placeholder { color: #7d8c86; }
 kbd { padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--paper); font: inherit; font-size: 0.85em; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.image-frame:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+.image-frame:focus-visible { outline: 3px solid #ffd23f; outline-offset: 4px; }
 .tag:focus-visible { outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus); }
 .tag:focus-visible .handle { opacity: 1; }
