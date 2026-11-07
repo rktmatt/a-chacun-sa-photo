@@ -31,11 +31,14 @@ l’oubliez, il faudra ressaisir la classe (vos photos ne sont pas concernées).
 
 Astuces :
 
-- **Zoom** : boutons − / + au-dessus de la photo, touches `+` `-` `0`, ou Ctrl + molette. Utile pour les photos de groupe.
+- **Zoom** : boutons − / + au-dessus de la photo, touches `+` `-` `0` (quand la photo a le focus), ou Ctrl + molette. Utile pour les photos de groupe.
+- **Agrandir le texte** de toute l’application : Ctrl + `=` (⌘ + `=` sur Mac), Ctrl + `-` pour réduire, Ctrl + `0` pour revenir à la taille normale.
 - Un cadre se déplace en le faisant glisser et se redimensionne par ses coins. Le × le retire ; le ⇄ l’attribue à
   l’élève sélectionné (en cas d’erreur).
 - **Au clavier** : choisissez l’élève, allez sur la photo avec Tab, appuyez sur Entrée pour créer un cadre au centre ;
   flèches pour le déplacer, Maj + flèches pour le redimensionner, Suppr pour le retirer.
+- **Sur Mac, au clavier seul** : pour que Tab passe aussi sur les boutons, activez « Navigation au clavier » dans
+  Réglages Système > Clavier (sinon, utilisez Option + Tab).
 
 > **Important** : l’application ne reconnaît pas les visages. Un enfant non autorisé que vous n’avez pas encadré, par
 > exemple au second plan, apparaîtra net chez les autres familles. Vérifiez chaque photo.

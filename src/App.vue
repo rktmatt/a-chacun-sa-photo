@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import iconUrl from "../src-tauri/icons/icon.png";
 import { version } from "../package.json";
@@ -32,6 +33,12 @@ const imageFrame = ref<HTMLElement>();
 const aboutDialog = ref<HTMLDialogElement>();
 const canvasBox = ref<HTMLElement>();
 const photoImg = ref<HTMLImageElement>();
+const photoInput = ref<HTMLInputElement>();
+const rosterInput = ref<HTMLInputElement>();
+const stageSection = ref<HTMLElement>();
+// Erreur de saisie affichée sous le champ concerné (RGAA 11.10) : id du champ + message.
+const fieldError = ref<{ field: string; text: string } | null>(null);
+const errorFor = (field: string) => fieldError.value?.field === field ? fieldError.value.text : "";
 const zoom = ref(1);
 const baseWidth = ref(0);
 const MAX_ZOOM = 6;
@@ -58,8 +65,13 @@ function toggleChild(id: number) { selectedChildId.value = selectedChildId.value
 function onKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement;
   if (["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) || aboutDialog.value?.open) return;
+  // Ctrl/⌘ + - / = sont réservés au zoom du texte de l'application (accessibilité) ; Ctrl/⌘ + 0 le remet à 100 %.
+  if ((event.ctrlKey || event.metaKey) && event.key === "0") { getCurrentWebview().setZoom(1).catch(() => {}); return; }
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
   if (event.key === "ArrowLeft" && selected.value > 0) selected.value--;
   if (event.key === "ArrowRight" && selected.value < photos.value.length - 1) selected.value++;
+  // Raccourcis d'une seule touche (RGAA 12.10) : actifs seulement quand le focus est dans la zone photo.
+  if (!stageSection.value?.contains(target)) return;
   if (event.key === "+" || event.key === "=") setZoom(zoom.value * 1.5);
   if (event.key === "-") setZoom(zoom.value / 1.5);
   if (event.key === "0") zoom.value = 1;
@@ -75,7 +87,20 @@ onMounted(async () => {
   });
 });
 
-function message(value: string) { notice.value = value; }
+// Vider puis réécrire : un message identique au précédent est ainsi annoncé à nouveau.
+function message(value: string) { notice.value = ""; nextTick(() => { notice.value = value; }); }
+
+// Place le focus (après rendu) sur l'élément désigné par un sélecteur CSS (RGAA 12.8).
+async function focusOn(selector: string) {
+  await nextTick();
+  document.querySelector<HTMLElement>(selector)?.focus();
+}
+// Erreur liée à un champ : message sous le champ, aria-invalid, focus sur le champ.
+function showFieldError(field: string, text: string) {
+  fieldError.value = { field, text };
+  focusOn(`#${field}`);
+}
+function clearFieldError(field: string) { if (fieldError.value?.field === field) fieldError.value = null; }
 
 async function unlockedWith(action: () => Promise<unknown>, success: string) {
   working.value = true;
@@ -84,11 +109,14 @@ async function unlockedWith(action: () => Promise<unknown>, success: string) {
     roster.value = await invoke<Child[]>("list_children");
     unlocked.value = true;
     lockPassphrase.value = lockPassphraseConfirm.value = "";
+    fieldError.value = null;
     message(success);
+    focusOn("#eleves-titre");
   } catch (error) {
     if (error === "LEGACY_ROSTER") { lockMode.value = "legacy"; message("La classe enregistrée sur cet ordinateur ne peut pas être ouverte."); }
     else if (error === "PASSPHRASE_SETUP") { lockMode.value = "setup"; notice.value = ""; }
     else if (error === "PASSPHRASE_REQUIRED") { lockMode.value = "unlock"; notice.value = ""; }
+    else if (lockMode.value === "unlock" || lockMode.value === "setup") showFieldError("lock-passphrase", errorText(error));
     else message(errorText(error));
   } finally { working.value = false; }
 }
@@ -97,8 +125,8 @@ const openRoster = () => unlockedWith(() => invoke("open_roster"), "La classe es
 
 async function submitPassphrase() {
   const creating = lockMode.value === "setup";
-  if (lockPassphrase.value.length < 8) { message("La phrase de passe doit contenir au moins 8 caractères."); return; }
-  if (creating && lockPassphrase.value !== lockPassphraseConfirm.value) { message("Les deux saisies ne sont pas identiques. Retapez la même phrase de passe dans les deux champs."); return; }
+  if (lockPassphrase.value.length < 8) { showFieldError("lock-passphrase", "La phrase de passe doit contenir au moins 8 caractères."); return; }
+  if (creating && lockPassphrase.value !== lockPassphraseConfirm.value) { showFieldError("lock-confirm", "Les deux saisies ne sont pas identiques. Retapez la même phrase de passe dans les deux champs."); return; }
   await unlockedWith(() => invoke("open_roster_with_passphrase", { passphrase: lockPassphrase.value, create: creating }),
     creating ? "Classe créée. Retenez bien votre phrase de passe : elle vous sera demandée à chaque ouverture." : "La classe est prête.");
 }
@@ -122,20 +150,23 @@ async function addChild() {
   try {
     await invoke("save_child", { name: childName.value, allowsDistribution: childAllowed.value });
     await reloadRoster();
+    message(`${childName.value.trim()} a été ajouté(e) à la classe.`);
     childName.value = "";
     childAllowed.value = false;
-  } catch (error) { message(errorText(error)); }
+    fieldError.value = null;
+  } catch (error) { showFieldError("child-name", errorText(error)); }
 }
 
-function startEditChild(child: Child) { editingChild.value = { ...child }; }
+function startEditChild(child: Child) { editingChild.value = { ...child }; focusOn("#edit-name"); }
+function stopEditChild(id: number) { editingChild.value = null; fieldError.value = null; focusOn(`[data-edit="${id}"]`); }
 async function saveEditChild() {
   const edit = editingChild.value;
   if (!edit || !edit.name.trim()) return;
   try {
     await invoke("update_child", { id: edit.id, name: edit.name, allowsDistribution: edit.allowsDistribution });
     await reloadRoster();
-    editingChild.value = null;
-  } catch (error) { message(errorText(error)); }
+    stopEditChild(edit.id);
+  } catch (error) { showFieldError("edit-name", errorText(error)); }
 }
 
 function forgetChildren(ids: number[]) {
@@ -154,6 +185,7 @@ async function deleteChild(child: Child) {
     editingChild.value = null;
     await reloadRoster();
     message(`${child.name} a été retiré(e) de la classe.`);
+    focusOn("#eleves-titre");
   } catch (error) { message(errorText(error)); }
 }
 
@@ -167,6 +199,7 @@ async function clearRoster() {
     editingChild.value = null;
     await reloadRoster();
     message("La liste des élèves a été effacée.");
+    focusOn("#eleves-titre");
   } catch (error) { message(errorText(error)); }
 }
 
@@ -187,25 +220,27 @@ async function importRoster(event: Event) {
 
 const backupFilter = [{ name: "Sauvegarde de classe", extensions: ["sauvegarde"] }];
 async function backupRoster() {
-  if (passphrase.value.length < 8) { message("Choisissez d’abord une phrase de passe d’au moins 8 caractères."); return; }
+  if (passphrase.value.length < 8) { showFieldError("backup-passphrase", "Choisissez d’abord une phrase de passe d’au moins 8 caractères."); return; }
   const destination = await save({ title: "Enregistrer la sauvegarde de la classe", defaultPath: `classe-${new Date().toISOString().slice(0, 10)}.sauvegarde`, filters: backupFilter });
   if (!destination) return;
   try {
     await invoke("backup_roster", { destination, passphrase: passphrase.value });
     passphrase.value = "";
+    fieldError.value = null;
     message("Sauvegarde chiffrée enregistrée. Conservez la phrase de passe : sans elle, la sauvegarde ne peut pas être rouverte.");
-  } catch (error) { message(errorText(error)); }
+  } catch (error) { showFieldError("backup-passphrase", errorText(error)); }
 }
 async function restoreRoster() {
-  if (passphrase.value.length < 8) { message("Saisissez d’abord la phrase de passe de la sauvegarde."); return; }
+  if (passphrase.value.length < 8) { showFieldError("backup-passphrase", "Saisissez d’abord la phrase de passe de la sauvegarde (8 caractères minimum)."); return; }
   const source = await open({ title: "Choisir une sauvegarde de classe", multiple: false, directory: false, filters: backupFilter });
   if (!source || Array.isArray(source)) return;
   try {
     const count = await invoke<number>("restore_roster", { source, passphrase: passphrase.value });
     passphrase.value = "";
     await reloadRoster();
+    fieldError.value = null;
     message(`${count} élève(s) restauré(s) depuis la sauvegarde.`);
-  } catch (error) { message(errorText(error)); }
+  } catch (error) { showFieldError("backup-passphrase", errorText(error)); }
 }
 
 async function normaliseImage(file: File): Promise<File> {
@@ -329,6 +364,7 @@ async function removePhoto() {
   URL.revokeObjectURL(photo.url);
   photos.value.splice(selected.value, 1);
   selected.value = Math.min(selected.value, Math.max(0, photos.value.length - 1));
+  focusOn(photos.value.length ? ".image-frame" : "#ajouter-photos");
 }
 
 // Zoom : garde sous le pointeur (ou au centre) le même point de l'image.
@@ -434,7 +470,7 @@ Avant d’exporter, vérifiez que chaque enfant non autorisé visible sur les ph
     }
     exportedSignature.value = signature;
     message(`${jobs.length} photo(s) exportée(s) dans « ${exportFolder} ». Les métadonnées ont été retirées.`);
-  } catch (error) { message(`Export interrompu : ${errorText(error)}`); } finally { working.value = false; exportProgress.value = null; }
+  } catch (error) { message(`Export interrompu : ${errorText(error)}`); } finally { working.value = false; exportProgress.value = null; focusOn("#exporter"); }
 }
 
 async function discardSession() {
@@ -442,33 +478,45 @@ async function discardSession() {
     { title: "Effacer la session", kind: "warning", okLabel: "Effacer", cancelLabel: "Annuler" })) return;
   photos.value.forEach((photo) => URL.revokeObjectURL(photo.url));
   photos.value = []; selected.value = 0; message("Session effacée. Aucune photo n’a été conservée par l’application.");
+  focusOn("#ajouter-photos");
 }
 onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenClose?.(); photos.value.forEach((photo) => URL.revokeObjectURL(photo.url)); });
 </script>
 
 <template>
-  <main :class="{ locked: !unlocked }">
+  <div class="app" :class="{ locked: !unlocked }">
+    <!-- Liens d'évitement (RGAA 12.7), visibles à la prise de focus. -->
+    <nav class="skip-links" aria-label="Accès rapide">
+      <template v-if="unlocked">
+        <a href="#zone-photo" @click.prevent="focusOn(current ? '.image-frame' : '#zone-photo')">Aller à la photo</a>
+        <a href="#eleves-titre" @click.prevent="focusOn('#eleves-titre')">Aller à la liste des élèves</a>
+      </template>
+      <a v-else href="#contenu" @click.prevent="focusOn('#contenu')">Aller au contenu</a>
+    </nav>
     <header class="topbar">
       <div class="brand"><img :src="iconUrl" alt="" /><div><h1>À chacun sa photo</h1><p>Préparez les photos à remettre aux familles.</p></div></div>
       <div class="actions">
         <template v-if="unlocked">
-        <label class="button" :class="photos.length ? 'secondary' : 'primary'">Ajouter des photos<input type="file" accept="image/jpeg,image/png,image/heic,.heic,.heif" multiple :disabled="working" @change="importPhotos" /></label>
+        <button id="ajouter-photos" type="button" :class="photos.length ? 'secondary' : 'primary'" :disabled="working" @click="photoInput?.click()">Ajouter des photos</button>
+        <input ref="photoInput" type="file" accept="image/jpeg,image/png,image/heic,.heic,.heif" multiple hidden @change="importPhotos" />
         <select v-model="maskMode" class="mask-mode" aria-label="Masquage des visages non autorisés" :disabled="working">
           <option value="blur">Masquage : flou</option>
           <option value="fill">Masquage : aplat opaque</option>
         </select>
-        <button class="primary" :disabled="working || !photos.length || !roster.length" @click="exportPhotos">Exporter par élève</button>
+        <button id="exporter" class="primary" :disabled="working || !photos.length || !roster.length" @click="exportPhotos">Exporter par élève</button>
         <button class="ghost" :disabled="!photos.length" @click="discardSession">Effacer la session</button>
         </template>
         <button type="button" class="ghost" @click="aboutDialog?.showModal()">À propos</button>
       </div>
     </header>
-    <div v-if="exportProgress" class="export-progress" role="status">
+    <div v-if="exportProgress" class="export-progress">
       <label for="export-progress">Export en cours : {{ exportProgress.done }} / {{ exportProgress.total }} photo(s)</label>
       <progress id="export-progress" :value="exportProgress.done" :max="exportProgress.total || 1"></progress>
     </div>
-    <p v-else-if="notice" class="notice" role="status">{{ notice }}</p>
+    <!-- Zone d'état toujours présente (RGAA 7.5) : seul son texte change, pour être annoncée par les lecteurs d'écran. -->
+    <p class="notice" :class="{ 'sr-only': exportProgress }" role="status">{{ exportProgress ? `Export en cours de ${exportProgress.total} photo(s)…` : notice }}</p>
 
+    <main id="contenu" class="content" tabindex="-1">
     <section v-if="!unlocked" class="unlock" :class="{ wide: lockMode === 'setup' || lockMode === 'unlock' }">
       <template v-if="lockMode === 'legacy'"><h2>Une ancienne classe ne peut pas être ouverte</h2><p>Elle peut provenir de la version d’essai qui utilisait une ancienne protection. Vous pouvez commencer une nouvelle classe : l’ancien fichier sera archivé, sans être supprimé.</p><button class="primary" :disabled="working" @click="startNewClass">Commencer une nouvelle classe</button></template>
       <form v-else-if="lockMode === 'setup'" class="passphrase" @submit.prevent="submitPassphrase">
@@ -480,15 +528,21 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
           <li>Choisissez quelques mots faciles à retenir pour vous, par exemple « le chat dort sur le radiateur » (8 caractères minimum).</li>
           <li>Notez-la en lieu sûr. Si vous l’oubliez, la liste ne pourra pas être récupérée : il faudra ressaisir la classe. Vos photos ne sont pas concernées, l’application ne les enregistre jamais.</li>
         </ul>
-        <label>Phrase de passe<input v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" /></label>
-        <label>Retapez-la pour vérifier<input v-model="lockPassphraseConfirm" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" /></label>
+        <label for="lock-passphrase">Phrase de passe (8 caractères minimum)</label>
+        <input id="lock-passphrase" v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" :aria-invalid="!!errorFor('lock-passphrase') || undefined" :aria-describedby="errorFor('lock-passphrase') ? 'lock-passphrase-error' : undefined" @input="clearFieldError('lock-passphrase')" />
+        <p v-if="errorFor('lock-passphrase')" id="lock-passphrase-error" class="field-error">{{ errorFor('lock-passphrase') }}</p>
+        <label for="lock-confirm">Retapez-la pour vérifier</label>
+        <input id="lock-confirm" v-model="lockPassphraseConfirm" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="new-password" :aria-invalid="!!errorFor('lock-confirm') || undefined" :aria-describedby="errorFor('lock-confirm') ? 'lock-confirm-error' : undefined" @input="clearFieldError('lock-confirm')" />
+        <p v-if="errorFor('lock-confirm')" id="lock-confirm-error" class="field-error">{{ errorFor('lock-confirm') }}</p>
         <label class="consent-field"><input v-model="showLockPassphrase" type="checkbox" /><span>Afficher ce que je tape</span></label>
         <button class="primary" :disabled="working || !lockPassphrase || !lockPassphraseConfirm">Créer ma classe protégée</button>
       </form>
       <form v-else-if="lockMode === 'unlock'" class="passphrase" @submit.prevent="submitPassphrase">
         <h2>Votre classe</h2>
         <p>Sur cet ordinateur, la liste de vos élèves est protégée par la phrase de passe que vous avez choisie lors de la création de la classe.</p>
-        <label>Phrase de passe<input v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="current-password" autofocus /></label>
+        <label for="lock-passphrase">Phrase de passe</label>
+        <input id="lock-passphrase" v-model="lockPassphrase" :type="showLockPassphrase ? 'text' : 'password'" autocomplete="current-password" autofocus :aria-invalid="!!errorFor('lock-passphrase') || undefined" :aria-describedby="errorFor('lock-passphrase') ? 'lock-passphrase-error' : undefined" @input="clearFieldError('lock-passphrase')" />
+        <p v-if="errorFor('lock-passphrase')" id="lock-passphrase-error" class="field-error">{{ errorFor('lock-passphrase') }}</p>
         <label class="consent-field"><input v-model="showLockPassphrase" type="checkbox" /><span>Afficher ce que je tape</span></label>
         <button class="primary" :disabled="working || !lockPassphrase">Ouvrir ma classe</button>
         <button type="button" class="ghost" :disabled="working" @click="forgotPassphrase">J’ai oublié ma phrase de passe</button>
@@ -498,9 +552,11 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
 
     <div v-else class="workspace">
       <aside class="register" aria-label="Élèves">
-        <h2>Élèves <span>{{ roster.length }}</span></h2>
+        <h2 id="eleves-titre" tabindex="-1">Élèves <span>{{ roster.length }}</span></h2>
         <form class="child-form" @submit.prevent="addChild">
-          <input v-model="childName" placeholder="Prénom et nom" aria-label="Prénom et nom" />
+          <label for="child-name" class="field-label">Prénom et nom de l’élève</label>
+          <input id="child-name" v-model="childName" autocomplete="off" :aria-invalid="!!errorFor('child-name') || undefined" :aria-describedby="errorFor('child-name') ? 'child-name-error' : undefined" @input="clearFieldError('child-name')" />
+          <p v-if="errorFor('child-name')" id="child-name-error" class="field-error">{{ errorFor('child-name') }}</p>
           <label class="consent-field"><input v-model="childAllowed" type="checkbox" /><span>Diffusion autorisée par la famille</span></label>
           <button class="secondary" :disabled="!childName.trim()">Ajouter l’élève</button>
           <p class="form-hint">Sans autorisation cochée, son visage est flouté dans les dossiers des autres élèves.</p>
@@ -515,11 +571,13 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
           </li>
           <li v-for="child in roster" :key="child.id">
             <form v-if="editingChild?.id === child.id" class="child-edit" @submit.prevent="saveEditChild">
-              <input v-model="editingChild.name" :aria-label="`Nom de ${child.name}`" />
+              <label for="edit-name" class="field-label">Prénom et nom</label>
+              <input id="edit-name" v-model="editingChild.name" autocomplete="off" :aria-invalid="!!errorFor('edit-name') || undefined" :aria-describedby="errorFor('edit-name') ? 'edit-name-error' : undefined" @input="clearFieldError('edit-name')" />
+              <p v-if="errorFor('edit-name')" id="edit-name-error" class="field-error">{{ errorFor('edit-name') }}</p>
               <label class="consent-field"><input v-model="editingChild.allowsDistribution" type="checkbox" /><span>Diffusion autorisée par la famille</span></label>
               <div class="child-edit-actions">
                 <button class="secondary" :disabled="!editingChild.name.trim()">Enregistrer</button>
-                <button type="button" class="ghost" @click="editingChild = null">Annuler</button>
+                <button type="button" class="ghost" @click="stopEditChild(child.id)">Annuler</button>
                 <button type="button" class="ghost danger" @click="deleteChild(child)">Supprimer</button>
               </div>
             </form>
@@ -528,18 +586,21 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
                 <span class="pupil-name">{{ child.name }}</span>
                 <span class="pupil-meta"><span v-if="photos.length" class="count">{{ photoCount(child.id) }} photo{{ photoCount(child.id) > 1 ? "s" : "" }}</span><span v-if="!child.allowsDistribution" class="status">masqué</span></span>
               </button>
-              <button type="button" class="edit-child" :aria-label="`Modifier ${child.name}`" title="Modifier le nom ou l’accord" @click="startEditChild(child)">✎</button>
+              <button type="button" class="edit-child" :data-edit="child.id" :aria-label="`Modifier ${child.name}`" title="Modifier le nom ou l’accord" @click="startEditChild(child)">✎</button>
             </template>
           </li>
         </ul>
         <p v-if="!roster.length" class="register-empty">Aucun élève pour l’instant. Ajoutez la classe ci-dessus : seuls le nom et l’accord de diffusion sont enregistrés.</p>
         <details class="roster-tools">
           <summary>Gérer la classe</summary>
-          <label class="button secondary">Importer une liste (CSV, TXT)<input type="file" accept=".csv,.txt,text/csv,text/plain" @change="importRoster" /></label>
+          <button type="button" class="secondary" @click="rosterInput?.click()">Importer une liste (CSV, TXT)</button>
+          <input ref="rosterInput" type="file" accept=".csv,.txt,text/csv,text/plain" hidden @change="importRoster" />
           <p class="form-hint">Un nom par ligne, ou un export tableur avec les colonnes « Nom » et « Prénom ». Les élèves importés sont masqués par défaut.</p>
           <fieldset>
             <legend>Changer d’ordinateur</legend>
-            <input v-model="passphrase" type="password" autocomplete="off" placeholder="Phrase de passe (8 caractères min.)" aria-label="Phrase de passe de la sauvegarde" />
+            <label for="backup-passphrase" class="field-label">Phrase de passe de la sauvegarde (8 caractères minimum)</label>
+            <input id="backup-passphrase" v-model="passphrase" type="password" autocomplete="off" :aria-invalid="!!errorFor('backup-passphrase') || undefined" :aria-describedby="errorFor('backup-passphrase') ? 'backup-passphrase-error' : undefined" @input="clearFieldError('backup-passphrase')" />
+            <p v-if="errorFor('backup-passphrase')" id="backup-passphrase-error" class="field-error">{{ errorFor('backup-passphrase') }}</p>
             <div class="tool-row">
               <button type="button" class="secondary" :disabled="!roster.length" @click="backupRoster">Sauvegarder</button>
               <button type="button" class="secondary" @click="restoreRoster">Restaurer</button>
@@ -550,7 +611,8 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
         </details>
       </aside>
 
-      <section class="stage" aria-label="Photo en cours">
+      <section id="zone-photo" ref="stageSection" class="stage" aria-labelledby="zone-photo-titre" tabindex="-1">
+        <h2 id="zone-photo-titre" class="sr-only">Photo en cours</h2>
         <template v-if="current">
           <div class="photo-nav">
             <button class="nav" :disabled="selected === 0" aria-label="Photo précédente" @click="selected--">‹</button>
@@ -559,15 +621,19 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
             <button class="nav" :disabled="selected >= photos.length - 1" aria-label="Photo suivante" @click="selected++">›</button>
             <div class="zoom" role="group" aria-label="Zoom">
               <button class="nav" :disabled="zoom <= 1" aria-label="Dézoomer" title="Dézoomer (−)" @click="setZoom(zoom / 1.5)">−</button>
-              <button class="nav zoom-level" :disabled="zoom === 1" title="Ajuster à la fenêtre (0)" @click="zoom = 1">{{ Math.round(zoom * 100) }} %</button>
+              <button class="nav zoom-level" :disabled="zoom === 1" :aria-label="`${Math.round(zoom * 100)} %, ajuster à la fenêtre`" title="Ajuster à la fenêtre (0)" @click="zoom = 1">{{ Math.round(zoom * 100) }} %</button>
               <button class="nav" :disabled="zoom >= MAX_ZOOM" aria-label="Zoomer" title="Zoomer (+ ou Ctrl + molette)" @click="setZoom(zoom * 1.5)">+</button>
             </div>
-            <button class="nav remove-photo" title="Retirer cette photo de la session" @click="removePhoto">Retirer</button>
+            <button class="nav remove-photo" title="Retirer cette photo de la session (le fichier d’origine n’est pas supprimé)" @click="removePhoto">Retirer la photo</button>
           </div>
           <div ref="canvasBox" class="canvas" :class="{ zoomed: zoom > 1 }" @wheel="wheelZoom">
             <div ref="imageFrame" class="image-frame" :class="{ armed: selectedChildId !== null }" tabindex="0" role="group" :aria-label="`Photo ${current.name}`" aria-describedby="keyboard-help" @keydown.enter.self.prevent="addTagAtCenter" @pointerdown="beginTag" @pointermove="moveTag" @pointerup="finishTag" @pointercancel="finishTag">
               <img ref="photoImg" :src="current.url" :alt="current.name" :style="imgStyle" draggable="false" />
-              <div v-for="tag in displayTags" :key="tag.id" class="tag" :class="{ masked: isMasked(tag), editing: editing?.tag.id === tag.id }" :style="tagStyle(tag)" :data-tag="tag.id" tabindex="0" role="button" :aria-label="tagLabel(tag)" aria-describedby="keyboard-help" @keydown="tagKey($event, tag)" title="Glisser pour déplacer, tirer un coin pour redimensionner" @pointerdown.stop="beginEdit($event, tag, 'move')"><div v-for="handle in handles" :key="handle" class="handle" :class="handle" aria-hidden="true" @pointerdown.stop="beginEdit($event, tag, handle)"></div><span>{{ childById(tag.childId)?.name ?? "Élève retiré" }}</span><button v-if="selectedChild && selectedChildId !== tag.childId" class="reassign" :aria-label="`Attribuer ce cadre à ${selectedChild.name}`" :title="`Attribuer ce cadre à ${selectedChild.name}`" @pointerdown.stop @click.stop="reassignTag(tag)">⇄</button><button :aria-label="`Retirer le cadre de ${childById(tag.childId)?.name}`" title="Retirer ce cadre" @pointerdown.stop @click.stop="removeTag(tag.id)">×</button></div>
+              <div v-for="tag in displayTags" :key="tag.id" class="tag-box" :style="tagStyle(tag)">
+                <div class="tag" :class="{ masked: isMasked(tag), editing: editing?.tag.id === tag.id }" :data-tag="tag.id" tabindex="0" role="group" aria-roledescription="cadre" :aria-label="tagLabel(tag)" aria-describedby="keyboard-help" @keydown="tagKey($event, tag)" title="Glisser pour déplacer, tirer un coin pour redimensionner" @pointerdown.stop="beginEdit($event, tag, 'move')"><div v-for="handle in handles" :key="handle" class="handle" :class="handle" aria-hidden="true" @pointerdown.stop="beginEdit($event, tag, handle)"></div><span aria-hidden="true">{{ childById(tag.childId)?.name ?? "Élève retiré" }}</span></div>
+                <button v-if="selectedChild && selectedChildId !== tag.childId" type="button" class="tag-action reassign" :aria-label="`Attribuer ce cadre à ${selectedChild.name}`" :title="`Attribuer ce cadre à ${selectedChild.name}`" @pointerdown.stop @click.stop="reassignTag(tag)">⇄</button>
+                <button type="button" class="tag-action" :aria-label="`Retirer le cadre de ${childById(tag.childId)?.name ?? 'élève retiré'}`" title="Retirer ce cadre" @pointerdown.stop @click.stop="removeTag(tag.id); imageFrame?.focus()">×</button>
+              </div>
               <div v-if="draft" class="tag draft" :class="{ masked: !selectedChild?.allowsDistribution }" :style="tagStyle(draft)"></div>
             </div>
           </div>
@@ -580,17 +646,18 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
           <nav class="strip" aria-label="Photos de la session">
             <span class="strip-summary">{{ taggedPhotos }} sur {{ photos.length }} identifiée{{ taggedPhotos > 1 ? "s" : "" }}</span>
             <ol>
-              <li v-for="(photo, index) in photos" :key="photo.id"><button type="button" :class="{ current: index === selected, done: photo.tags.length }" :aria-current="index === selected ? 'true' : undefined" :aria-label="`Photo ${index + 1}${photo.tags.length ? ', identifiée' : ''}`" @click="selected = index">{{ index + 1 }}</button></li>
+              <li v-for="(photo, index) in photos" :key="photo.id"><button type="button" :class="{ current: index === selected, done: photo.tags.length }" :aria-current="index === selected ? 'true' : undefined" :aria-label="`Photo ${index + 1}${photo.tags.length ? ', identifiée' : ''}`" @click="selected = index"><span v-if="photo.tags.length" class="done-mark" aria-hidden="true">✓</span>{{ index + 1 }}</button></li>
             </ol>
           </nav>
         </template>
         <div v-else class="empty">
           <h2>Ajoutez les photos de la sortie, du spectacle ou de la classe</h2>
           <p>Elles restent uniquement dans la mémoire de cette session, jusqu’à l’export ou l’effacement. Formats acceptés : JPEG, PNG, HEIC.</p>
-          <label class="button primary">Ajouter des photos<input type="file" accept="image/jpeg,image/png,image/heic,.heic,.heif" multiple :disabled="working" @change="importPhotos" /></label>
+          <button type="button" class="primary" :disabled="working" @click="photoInput?.click()">Ajouter des photos</button>
         </div>
       </section>
     </div>
+    </main>
     <dialog ref="aboutDialog" class="about" aria-labelledby="about-title">
       <form method="dialog" class="about-close"><button class="ghost" aria-label="Fermer">×</button></form>
       <h2 id="about-title">À chacun sa photo <span>version {{ version }}</span></h2>
@@ -604,7 +671,8 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
       </ul>
       <h3>Utiliser le clavier</h3>
       <ul>
-        <li><kbd>←</kbd> <kbd>→</kbd> : photo précédente ou suivante ; <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> : zoom.</li>
+        <li><kbd>←</kbd> <kbd>→</kbd> : photo précédente ou suivante ; <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> : zoom sur la photo (quand la photo ou ses boutons ont le focus).</li>
+        <li><kbd>Ctrl</kbd> (<kbd>⌘</kbd> sur Mac) + <kbd>=</kbd> ou <kbd>−</kbd> : agrandir ou réduire le texte de l’application ; + <kbd>0</kbd> : taille normale.</li>
         <li>Choisissez un élève, placez-vous sur la photo avec <kbd>Tab</kbd> puis appuyez sur <kbd>Entrée</kbd> pour ajouter un cadre au centre.</li>
         <li>Sur un cadre : flèches pour le déplacer, <kbd>Maj</kbd> + flèches pour le redimensionner, <kbd>Suppr</kbd> pour le retirer.</li>
       </ul>
@@ -614,8 +682,8 @@ onBeforeUnmount(() => { window.removeEventListener("keydown", onKey); unlistenCl
       <p>Logiciel libre distribué sous licence EUPL-1.2 (licence publique de l’Union européenne). Vous pouvez l’utiliser, l’étudier, le modifier et le redistribuer.</p>
       <details>
         <summary>Composants tiers et leurs licences</summary>
-        <pre>{{ thirdPartyNotices }}</pre>
+        <pre lang="en">{{ thirdPartyNotices }}</pre>
       </details>
     </dialog>
-  </main>
+  </div>
 </template>

@@ -83,6 +83,25 @@ env -u DBUS_SESSION_BUS_ADDRESS ./a-chacun-sa-photo.AppImage
 - [ ] **Clavier seul** : Tab jusqu’à la photo, Entrée ajoute un cadre au centre, flèches déplacent, Maj + flèches
   redimensionnent, Suppr retire ; ←/→ changent de photo quand aucun cadre n’a le focus.
 - [ ] Zoom (boutons, `+`/`-`/`0`, Ctrl/⌘ + molette) : les cadres restent sur les visages.
+- [ ] **Clavier seul, sans souris** : « Ajouter des photos » (en-tête et écran vide) et « Gérer la classe » →
+  « Importer une liste » s’atteignent avec Tab et ouvrent le sélecteur de fichiers avec Entrée ou Espace (sous macOS,
+  Tab ne passe sur les boutons que si « Navigation au clavier » est activée dans Réglages Système > Clavier ; sinon
+  utiliser Option + Tab).
+- [ ] **Taille du texte** : Ctrl/⌘ + `=` agrandit tout le texte de l’application (jusqu’à 200 % au moins), Ctrl/⌘ + `-`
+  le réduit, Ctrl/⌘ + `0` revient à 100 %, sans zoomer la photo ; à 200 %, rien n’est coupé ni inaccessible. Fenêtre réduite à 640 px de large :
+  la liste des élèves passe au-dessus de la photo.
+- [ ] **Liens d’évitement** : la première tabulation affiche « Aller à la photo », puis « Aller à la liste des élèves » ;
+  Entrée place le focus au bon endroit.
+- [ ] **Erreurs de saisie** : une phrase de passe trop courte, ou un élève déjà présent, affiche le message sous le champ
+  et y replace le focus.
+- [ ] **Focus jamais perdu** : après « Ouvrir ma classe », la modification ou la suppression d’un élève, l’export ou
+  « Effacer la session », la tabulation suivante reste à un endroit logique.
+- [ ] **macOS, langue** : les menus sont en français (« Édition », « Fenêtre »), le sélecteur de fichiers aussi
+  (« Annuler », « Ouvrir »), et VoiceOver lit l’application avec une voix française.
+- [ ] ⌘Q avec des photos identifiées non exportées : l’avertissement « Quitter sans exporter ? » s’affiche.
+- [ ] **Lecteur d’écran** (NVDA sous Windows, VoiceOver sous macOS) : les messages du bandeau (« La classe est prête »,
+  « 3 photo(s) ajoutée(s) », fin d’export, erreurs) sont lus automatiquement ; un cadre est annoncé « Cadre de …,
+  cadre » et ses boutons × / ⇄ sont atteignables avec Tab juste après.
 - [ ] Supprimer l’élève Chloé : ses cadres deviennent « Visage inconnu », toujours floutés.
 
 ## 5. Export (vérification essentielle)
