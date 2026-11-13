@@ -33,6 +33,20 @@ Linux `~/.local/share/a-chacun-sa-photo`. Supprimer aussi l’entrée `fr.achacu
   - Windows (PowerShell) : `Get-NetTCPConnection | Where-Object OwningProcess -in (Get-Process "À chacun sa photo", msedgewebview2).Id`
     ne renvoie rien (fermer au préalable les autres applications qui utilisent WebView2 : Teams, Outlook…).
 
+### Paquets Linux
+
+Sur une Ubuntu LTS à jour (ou une Debian / PrimTux), avec le `.deb` et l’AppImage de la CI :
+
+- [ ] `sudo apt install ./a-chacun-sa-photo_X.Y.Z_amd64.deb` (remplacer `X.Y.Z` par la version) s’installe sans erreur et
+  sans message sur le nom du paquet ; les dépendances (`libwebkit2gtk-4.1-0`, `libgtk-3-0`) sont installées
+  automatiquement.
+- [ ] `dpkg -s a-chacun-sa-photo` indique `Status: install ok installed` et la bonne version.
+- [ ] Le menu des applications affiche « **À chacun sa photo** » (avec l’accent) et son icône ; l’application démarre
+  depuis le menu, et le titre de la fenêtre est « À chacun sa photo ».
+- [ ] `sudo apt remove a-chacun-sa-photo` désinstalle proprement ; la classe (`~/.local/share/a-chacun-sa-photo`) est
+  conservée et se rouvre après réinstallation.
+- [ ] AppImage : après `chmod +x`, elle démarre par double-clic ou depuis un terminal, sans installation.
+
 ## 2. Ouverture de la classe
 
 - [ ] Premier lancement, « Ouvrir ma classe » : la classe s’ouvre sans rien demander (clé rangée dans le coffre-fort du
