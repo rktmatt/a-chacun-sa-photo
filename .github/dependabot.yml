@@ -1,0 +1,47 @@
+# Mises à jour des dépendances (GitHub).
+# - Tauri : le paquet npm @tauri-apps/* et les crates tauri* doivent garder la même version
+#   majeure.mineure. Ils ont chacun leur groupe « tauri », planifié le même jour : fusionner les
+#   deux PR ensemble.
+# - Après chaque PR npm ou cargo, régénérer la liste des licences et la pousser sur la branche :
+#   node scripts/third-party-notices.mjs (la CI le vérifie).
+# - Délai de 7 jours avant de proposer une nouvelle version (limite le risque de paquet compromis).
+#   Les mises à jour de sécurité ne sont pas concernées par ce délai.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

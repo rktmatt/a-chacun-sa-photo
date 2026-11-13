@@ -22,7 +22,7 @@ cd src-tauri && cargo test     # Rust tests (backup/restore, passphrase roster, 
 node scripts/third-party-notices.mjs   # regenerate THIRD-PARTY-NOTICES.md after any dependency change (CI checks it)
 ```
 
-CI: `.gitlab-ci.yml` (Forge, Linux: checks + deb/AppImage) and `.github/workflows/build.yml` (GitHub mirror, Windows/macOS/Linux installers, unsigned for now). User docs in French under `docs/` (teacher guide, RGPD kit); keep them in sync with UI changes, and add a `CHANGELOG.md` entry.
+Repo of record is GitHub (`rktmatt/a-chacun-sa-photo`): PRs, issues and Dependabot (`.github/dependabot.yml`) happen there; the Forge des communs numériques éducatifs (GitLab) is a read-only mirror, never committed to directly. CI: `.github/workflows/build.yml` (PRs: checks + tests on 3 OS incl. notices check; main/tags/manual: Windows/macOS/Linux installers, unsigned for now) and `.gitlab-ci.yml` (runs on the Forge mirror, Linux: checks + deb/AppImage). Dependabot PRs: regenerate notices on the branch; merge the npm and cargo « tauri » group PRs together. User docs in French under `docs/` (teacher guide, RGPD kit); keep them in sync with UI changes, and add a `CHANGELOG.md` entry.
 
 Frontend tests: pure rules (blur decision `isMaskedFor`, `maskEllipse`, `exportJobs`, `forgetTags`, `editBox`, `parseNames`, file/folder names) live in `src/logic.ts`, tested by Vitest in node env (no DOM/Tauri). Keep new pure logic there, not in `App.vue`. Manual pre-release checklist: `docs/recette.md` (keep in sync with UI). No linter yet.
 
