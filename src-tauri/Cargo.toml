@@ -14,7 +14,7 @@ tauri-build = { version = "2.4.0", features = [] }
 
 [dependencies]
 base64 = "0.22"
-dirs = "6.0"
+dirs = "7.0"
 keyring = { version = "3.6.2", features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 rand = "0.9"
 rusqlite = { version = "0.37", features = ["bundled-sqlcipher-vendored-openssl"] }
