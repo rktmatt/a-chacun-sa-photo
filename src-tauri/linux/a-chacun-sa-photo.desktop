@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories={{categories}}
+Comment=Tri hors ligne des photos de classe par élève
+Exec={{exec}}
+StartupWMClass={{exec}}
+Icon={{icon}}
+Name=À chacun sa photo
+Terminal=false
+Type=Application

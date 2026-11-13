@@ -22,33 +22,33 @@ reconstruisant l’application depuis ses sources (voir `README.md`).
 
 | Composant | Version | Licence |
 |---|---|---|
-| @babel/helper-string-parser | 7.29.7 | MIT |
+| @babel/helper-string-parser | 7.29.14 | MIT |
 | @babel/helper-validator-identifier | 7.29.7 | MIT |
-| @babel/parser | 7.29.9 | MIT |
-| @babel/types | 7.29.8 | MIT |
+| @babel/parser | 7.29.14 | MIT |
+| @babel/types | 7.29.14 | MIT |
 | @fontsource-variable/atkinson-hyperlegible-next | 5.3.0 | OFL-1.1 |
 | @jridgewell/sourcemap-codec | 1.6.0 | MIT |
-| @tauri-apps/api | 2.12.0 | Apache-2.0 OR MIT |
-| @tauri-apps/plugin-dialog | 2.8.0 | MIT OR Apache-2.0 |
-| @vue/compiler-core | 3.5.43 | MIT |
-| @vue/compiler-dom | 3.5.43 | MIT |
-| @vue/compiler-sfc | 3.5.43 | MIT |
-| @vue/compiler-ssr | 3.5.43 | MIT |
-| @vue/reactivity | 3.5.43 | MIT |
-| @vue/runtime-core | 3.5.43 | MIT |
-| @vue/runtime-dom | 3.5.43 | MIT |
-| @vue/server-renderer | 3.5.43 | MIT |
-| @vue/shared | 3.5.43 | MIT |
+| @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT |
+| @tauri-apps/plugin-dialog | 2.8.4 | MIT OR Apache-2.0 |
+| @vue/compiler-core | 3.5.45 | MIT |
+| @vue/compiler-dom | 3.5.45 | MIT |
+| @vue/compiler-sfc | 3.5.45 | MIT |
+| @vue/compiler-ssr | 3.5.45 | MIT |
+| @vue/reactivity | 3.5.45 | MIT |
+| @vue/runtime-core | 3.5.45 | MIT |
+| @vue/runtime-dom | 3.5.45 | MIT |
+| @vue/server-renderer | 3.5.45 | MIT |
+| @vue/shared | 3.5.45 | MIT |
 | csstype | 3.2.3 | MIT |
 | entities | 7.0.1 | BSD-2-Clause |
 | estree-walker | 2.0.2 | MIT |
-| heic-to | 1.5.2 | LGPL-3.0 |
+| heic-to | 1.6.7 | LGPL-3.0 |
 | magic-string | 0.30.21 | MIT |
-| nanoid | 3.3.19 | MIT |
+| nanoid | 3.3.20 | MIT |
 | picocolors | 1.1.1 | ISC |
-| postcss | 8.5.28 | MIT |
+| postcss | 8.5.32 | MIT |
 | source-map-js | 1.2.2 | BSD-3-Clause |
-| vue | 3.5.43 | MIT |
+| vue | 3.5.45 | MIT |
 
 ## Crates Rust intégrées au programme
 
@@ -102,6 +102,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | cesu8 | 1.1.0 | Apache-2.0/MIT |
 | cfb | 0.14.0 | MIT |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 |
+| chacha20 | 0.10.2 | MIT OR Apache-2.0 |
 | chrono | 0.4.45 | MIT OR Apache-2.0 |
 | cipher | 0.4.4 | MIT OR Apache-2.0 |
 | combine | 4.6.8 | MIT |
@@ -113,6 +114,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | core-graphics | 0.25.0 | MIT OR Apache-2.0 |
 | core-graphics-types | 0.2.0 | MIT OR Apache-2.0 |
 | cpufeatures | 0.2.17 | MIT OR Apache-2.0 |
+| cpufeatures | 0.3.1 | MIT OR Apache-2.0 |
 | crc32fast | 1.5.2 | MIT OR Apache-2.0 |
 | crossbeam-channel | 0.5.17 | MIT OR Apache-2.0 |
 | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 |
@@ -132,7 +134,6 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | derive_more | 2.1.1 | MIT |
 | derive_more-impl | 2.1.1 | MIT |
 | digest | 0.10.7 | MIT OR Apache-2.0 |
-| dirs | 6.0.0 | MIT OR Apache-2.0 |
 | dirs | 7.0.0 | MIT OR Apache-2.0 |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 |
 | dispatch2 | 0.3.1 | Zlib OR Apache-2.0 OR MIT |
@@ -161,7 +162,6 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | field-offset | 0.3.6 | MIT OR Apache-2.0 |
 | flate2 | 1.1.10 | MIT OR Apache-2.0 |
 | fnv | 1.0.7 | Apache-2.0 / MIT |
-| foldhash | 0.1.5 | Zlib |
 | foldhash | 0.2.0 | Zlib |
 | foreign-types | 0.5.0 | MIT/Apache-2.0 |
 | foreign-types-macros | 0.2.4 | MIT/Apache-2.0 |
@@ -198,9 +198,8 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | gtk-sys | 0.18.2 | MIT |
 | gtk3-macros | 0.18.2 | MIT |
 | hashbrown | 0.12.3 | MIT OR Apache-2.0 |
-| hashbrown | 0.15.5 | MIT OR Apache-2.0 |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 |
-| hashlink | 0.10.0 | MIT OR Apache-2.0 |
+| hashlink | 0.12.2 | MIT OR Apache-2.0 |
 | heck | 0.4.1 | MIT OR Apache-2.0 |
 | heck | 0.5.0 | MIT OR Apache-2.0 |
 | hermit-abi | 0.5.2 | MIT OR Apache-2.0 |
@@ -216,7 +215,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | hyper-util | 0.1.21 | MIT |
 | iana-time-zone | 0.1.65 | MIT OR Apache-2.0 |
 | iana-time-zone-haiku | 0.1.2 | MIT OR Apache-2.0 |
-| ico | 0.5.0 | MIT |
+| ico | 0.6.0 | MIT |
 | icu_collections | 2.3.0 | Unicode-3.0 |
 | icu_locale_core | 2.3.0 | Unicode-3.0 |
 | icu_normalizer | 2.3.0 | Unicode-3.0 |
@@ -255,7 +254,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | libdbus-sys | 0.2.7 | Apache-2.0/MIT |
 | libloading | 0.7.4 | ISC |
 | libredox | 0.1.25 | MIT |
-| libsqlite3-sys | 0.35.0 | MIT |
+| libsqlite3-sys | 0.39.1 | MIT |
 | linux-keyutils | 0.2.5 | Apache-2.0 OR MIT |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
@@ -318,7 +317,6 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT |
 | piper | 0.2.5 | MIT OR Apache-2.0 |
 | plist | 1.10.1 | MIT |
-| png | 0.17.16 | MIT OR Apache-2.0 |
 | png | 0.18.1 | MIT OR Apache-2.0 |
 | polling | 3.11.0 | Apache-2.0 OR MIT |
 | portable-atomic | 1.15.0 | Apache-2.0 OR MIT |
@@ -337,12 +335,11 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | quote | 1.0.47 | MIT OR Apache-2.0 |
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
+| rand | 0.10.3 | MIT OR Apache-2.0 |
 | rand | 0.8.8 | MIT OR Apache-2.0 |
-| rand | 0.9.5 | MIT OR Apache-2.0 |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 |
-| rand_chacha | 0.9.0 | MIT OR Apache-2.0 |
+| rand_core | 0.10.1 | MIT OR Apache-2.0 |
 | rand_core | 0.6.4 | MIT OR Apache-2.0 |
-| rand_core | 0.9.5 | MIT OR Apache-2.0 |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib |
 | redox_syscall | 0.5.18 | MIT |
 | redox_users | 0.5.3 | MIT |
@@ -352,8 +349,9 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | regex-automata | 0.4.18 | MIT OR Apache-2.0 |
 | regex-syntax | 0.8.11 | MIT OR Apache-2.0 |
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
-| rfd | 0.16.0 | MIT |
-| rusqlite | 0.37.0 | MIT |
+| rfd | 0.17.2 | MIT |
+| rsqlite-vfs | 0.2.0 | MIT |
+| rusqlite | 0.41.1 | MIT |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 |
@@ -394,12 +392,13 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | softbuffer | 0.4.8 | MIT OR Apache-2.0 |
 | soup3 | 0.5.0 | MIT |
 | soup3-sys | 0.5.0 | MIT |
+| sqlite-wasm-rs | 0.6.3 | MIT |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 |
 | static_assertions | 1.1.0 | MIT OR Apache-2.0 |
 | string_cache | 0.9.0 | MIT OR Apache-2.0 |
 | strsim | 0.11.1 | MIT |
 | subtle | 2.6.1 | BSD-3-Clause |
-| swift-rs | 1.0.8 | MIT OR Apache-2.0 |
+| swift-rs | 1.0.9 | MIT OR Apache-2.0 |
 | syn | 1.0.109 | MIT OR Apache-2.0 |
 | syn | 2.0.119 | MIT OR Apache-2.0 |
 | syn | 3.0.6 | MIT OR Apache-2.0 |
@@ -407,14 +406,14 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | synstructure | 0.14.0 | MIT |
 | tao | 0.37.1 | Apache-2.0 |
 | tao-macros | 0.1.4 | MIT OR Apache-2.0 |
-| tauri | 2.12.0 | Apache-2.0 OR MIT |
-| tauri-codegen | 2.7.0 | Apache-2.0 OR MIT |
-| tauri-macros | 2.7.0 | Apache-2.0 OR MIT |
-| tauri-plugin-dialog | 2.8.0 | Apache-2.0 OR MIT |
-| tauri-plugin-fs | 2.6.0 | Apache-2.0 OR MIT |
-| tauri-runtime | 2.12.0 | Apache-2.0 OR MIT |
-| tauri-runtime-wry | 2.12.0 | Apache-2.0 OR MIT |
-| tauri-utils | 2.10.0 | Apache-2.0 OR MIT |
+| tauri | 2.12.5 | Apache-2.0 OR MIT |
+| tauri-codegen | 2.7.4 | Apache-2.0 OR MIT |
+| tauri-macros | 2.7.4 | Apache-2.0 OR MIT |
+| tauri-plugin-dialog | 2.8.4 | Apache-2.0 OR MIT |
+| tauri-plugin-fs | 2.7.1 | Apache-2.0 OR MIT |
+| tauri-runtime | 2.12.2 | Apache-2.0 OR MIT |
+| tauri-runtime-wry | 2.12.3 | Apache-2.0 OR MIT |
+| tauri-utils | 2.10.2 | Apache-2.0 OR MIT |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 |
 | tendril | 0.5.1 | MIT OR Apache-2.0 |
 | thiserror | 1.0.69 | MIT OR Apache-2.0 |
