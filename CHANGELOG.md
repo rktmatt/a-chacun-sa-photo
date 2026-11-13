@@ -47,6 +47,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 - Tous les messages d’erreur sont en français.
 - Identifiant de l’application : `fr.achacunsaphoto`.
 
+### Corrigé
+- Paquets Linux (.deb, .rpm) : nom de paquet en ASCII (`a-chacun-sa-photo`), le « à » initial les rendait
+  impossibles à installer ; le menu des applications affiche toujours « À chacun sa photo ».
+
 ### Sécurité
 - Un cadre dont l’élève n’existe plus est flouté au lieu d’être laissé net.
 - Les données supprimées de la liste des élèves sont écrasées dans le fichier (`secure_delete`).
