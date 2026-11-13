@@ -21,6 +21,12 @@ updates:
         patterns: ["@tauri-apps/*"]
       npm-minor-patch:
         update-types: ["minor", "patch"]
+        exclude-patterns: ["@tauri-apps/*"]
+    ignore:
+      # TypeScript 7 (compilateur natif) n'expose plus l'API JavaScript dont vue-tsc a besoin.
+      # À retirer quand vue-tsc prendra en charge TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
@@ -35,6 +41,7 @@ updates:
         patterns: ["tauri", "tauri-*"]
       cargo-minor-patch:
         update-types: ["minor", "patch"]
+        exclude-patterns: ["tauri", "tauri-*"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -52,6 +52,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 - Les données supprimées de la liste des élèves sont écrasées dans le fichier (`secure_delete`).
 - Mise à jour des dépendances signalées par des alertes de sécurité : source-map-js 1.2.2 (embarqué) ; outils de
   développement Vite 6.4.6, Vitest 5.1, vue-tsc 3.3 (tinypool et minimatch ne sont plus installés).
+- Mise à jour des dépendances : SQLCipher 4.19 (via rusqlite 0.41, même format de fichier), rand 0.10, base64 0.23,
+  dirs 7 (emplacement de la liste des élèves inchangé), Tauri 2.12.5, heic-to 1.6.7, Vue 3.5.45 ; outils Vite 8.
 
 ## [0.1.0]
 
