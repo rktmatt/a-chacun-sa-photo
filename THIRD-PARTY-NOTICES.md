@@ -47,7 +47,7 @@ reconstruisant l’application depuis ses sources (voir `README.md`).
 | nanoid | 3.3.19 | MIT |
 | picocolors | 1.1.1 | ISC |
 | postcss | 8.5.28 | MIT |
-| source-map-js | 1.2.1 | BSD-3-Clause |
+| source-map-js | 1.2.2 | BSD-3-Clause |
 | vue | 3.5.43 | MIT |
 
 ## Crates Rust intégrées au programme
