@@ -1,4 +1,5 @@
-# Construction des installateurs sur les trois systèmes (miroir GitHub du dépôt de la Forge).
+# Construction des installateurs sur les trois systèmes. GitHub est le dépôt de référence
+# (pull requests, Dependabot) ; la Forge en est une copie en lecture seule.
 # Les installateurs ne sont pas encore signés : ajouter les certificats Windows et Apple
 # dans les secrets du dépôt quand ils seront disponibles (voir la documentation de tauri-action).
 #
