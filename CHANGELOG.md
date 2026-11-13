@@ -21,6 +21,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 - Pré-audit d’accessibilité RGAA 4.1.2 (`docs/rgaa/`) : grille complétée, rapport avec corrections priorisées, projet de
   déclaration d’accessibilité.
 - Agrandissement du texte de l’application avec Ctrl/⌘ + `=` / `-` (Ctrl/⌘ + `0` pour revenir à 100 %) ; la fenêtre peut être réduite à 640 px de large.
+- Mises à jour des dépendances par Dependabot (npm, cargo, GitHub Actions) avec délai de 7 jours ; sur GitHub, les pull
+  requests ne lancent que les vérifications et les tests, et la CI vérifie que la liste des licences tierces est à jour.
 
 ### Corrigé (accessibilité)
 - « Ajouter des photos » et « Importer une liste » sont désormais utilisables au clavier.
