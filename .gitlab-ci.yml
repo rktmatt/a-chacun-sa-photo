@@ -1,6 +1,8 @@
 # Intégration continue pour la Forge des communs numériques éducatifs (GitLab).
+# La Forge est une copie en lecture seule du dépôt de référence sur GitHub : les contributions et
+# les mises à jour Dependabot passent par GitHub, jamais par des commits directs ici.
 # Les runners partagés de la Forge sont sous Linux : vérifications + paquets Linux ici.
-# Les installateurs Windows et macOS sont construits par .github/workflows/build.yml (miroir GitHub).
+# Les installateurs Windows et macOS sont construits par .github/workflows/build.yml.
 
 stages: [check, build]
 
