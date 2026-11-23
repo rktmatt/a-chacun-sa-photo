@@ -17,7 +17,7 @@ base64 = "0.23"
 dirs = "7.0"
 keyring = { version = "3.6.2", features = ["apple-native", "windows-native", "linux-native-sync-persistent", "crypto-rust"] }
 rand = "0.10"
-rusqlite = { version = "0.41", features = ["bundled-sqlcipher-vendored-openssl"] }
+rusqlite = { version = "0.43", features = ["bundled-sqlcipher-vendored-openssl"] }
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2.8.0", features = [] }
 tauri-plugin-dialog = "2.8.4"
