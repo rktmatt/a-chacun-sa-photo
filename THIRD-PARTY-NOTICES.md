@@ -335,7 +335,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | quote | 1.0.47 | MIT OR Apache-2.0 |
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later |
-| rand | 0.10.3 | MIT OR Apache-2.0 |
+| rand | 0.10.4 | MIT OR Apache-2.0 |
 | rand | 0.8.8 | MIT OR Apache-2.0 |
 | rand_chacha | 0.3.1 | MIT OR Apache-2.0 |
 | rand_core | 0.10.1 | MIT OR Apache-2.0 |
