@@ -254,7 +254,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | libdbus-sys | 0.2.7 | Apache-2.0/MIT |
 | libloading | 0.7.4 | ISC |
 | libredox | 0.1.25 | MIT |
-| libsqlite3-sys | 0.39.1 | MIT |
+| libsqlite3-sys | 0.40.0 | MIT |
 | linux-keyutils | 0.2.5 | Apache-2.0 OR MIT |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | litemap | 0.8.3 | Unicode-3.0 |
@@ -351,7 +351,7 @@ Liste pour toutes les plateformes (Windows, macOS, Linux) ; chaque installateur 
 | reqwest | 0.13.5 | MIT OR Apache-2.0 |
 | rfd | 0.17.2 | MIT |
 | rsqlite-vfs | 0.2.0 | MIT |
-| rusqlite | 0.41.1 | MIT |
+| rusqlite | 0.43.0 | MIT |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 |
